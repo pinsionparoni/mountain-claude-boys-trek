@@ -1,4 +1,18 @@
-anthropic>=2.8.0
+# Coach models
+anthropic>=2.8.0   # Claude: development and comparison baseline
+openai>=3.50.0     # client for OpenAI-compatible endpoints: Gemma on Verda (vLLM), Nemotron on NVIDIA Build
+
+# Data: S-Pankki CSVs -> PostgreSQL (Aiven)
+psycopg[binary]>=3.3.9
+pandas>=3.1.1
+
+# Backend web API for the mobile front end
+fastapi>=0.162.7
+uvicorn[standard]>=0.54.0
+
+# What-if calculations in Modal Sandboxes
+modal>=1.6.4
+
 python-dotenv
 
 # Optional, only needed with COACH_WEB_SEARCH=1

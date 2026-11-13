@@ -1,111 +1,75 @@
 # mountain-claude-boys-trek
-Junction 2026 project repo for Mountain Claude Boys team
-This project is for the Junction 2026 S-Pankki challenge. Full challenge description: [CHALLENGE.md](CHALLENGE.md). Tech stack plan: [TECH_STACK.md](TECH_STACK.md)
 
-From the challenge description:
+**An AI money coach that lets you chat with your own banking data.** Built by team Mountain Claude Boys for the Junction 2026 S-Pankki challenge, *Personal Economic Trainer*.
 
-"The Challenge
-Explore how AI can turn personal banking data into a trusted financial coach for everyday life.
+> 🚧 Work in progress during the hackathon. This README describes the product for graders and will be finalised before submission.
 
-S-Bank is Finland’s fourth-largest bank, with 3.5 million customers, and its S-mobiili app is used weekly by one in three Finnish adults. We want to reimagine personal finance by letting people talk with their own financial data through AI. Banking today often stops at statements and transaction lists. We want to make it conversational, insightful, and personalised. At Junction, we invite you to help us build the next generation of AI-driven personal economic trainers that make money matters simple and engaging for everyone.
+## The problem
 
-Using a large synthetic transaction dataset modelled on real S-Bank data, build an AI experience that lets people chat with their own money, from simple questions like “How much did I spend on taxis last month?” to deeper ones like “What kind of spender am I?”, “What is safe for me to spend this week?” or “How much could I save if I reduced dining out by 20%?”.
+Banking apps stop at statements and transaction lists. S-Bank asked for an AI experience where people can **talk with their own money**: from simple questions like *"How much did I spend on taxis last month?"* to deeper ones like *"What kind of spender am I?"*, *"What is safe for me to spend this week?"* or *"How much could I save if I reduced dining out by 20%?"*
 
-We value a pedagogical angle: everyone’s spending falls into three baskets:
+Full brief: [CHALLENGE.md](CHALLENGE.md)
 
-mandatory and regular (e.g. rent)
-mandatory and irregular (e.g. a broken washing machine), and
-everyday spending that slips through your fingers (e.g. coffees) — and solutions that help people understand where their money really goes will go far with us.
-Think in the spirit of MyData: let users explore their own data freely rather than showing fixed charts the bank has picked for them. You can enhance these insights with open data sources (e.g., Statistics Finland) to offer meaningful benchmarks.
+## What our coach does
 
-Recommended output: a mobile app, or a web app that can be embedded in a mobile app — our customers are on mobile.
+- **Answers questions about your own transactions** in plain language, in Finnish or English.
+- **Teaches the three spending baskets** from the brief:
+  1. mandatory and regular (rent, utilities),
+  2. mandatory and irregular (a broken washing machine),
+  3. everyday spending that slips through your fingers (coffees, takeaway).
+- **Computes, doesn't guess:** what-if and safe-to-spend numbers come from real calculations on your data. *(planned)*
+- **Keeps customer data in Europe** by running open models on EU infrastructure. *(planned)*
+- **Optional benchmarks** from open sources such as Statistics Finland, without ever sending personal data to a search engine.
 
-Extra details: To our knowledge, no Finnish bank yet lets customers chat with their own financial data, making this a first-of-its-kind opportunity in Finnish banking. The challenge ties directly to S- Bank’s strategy of serving customers increasingly digitally and to our vision for S-mobiili. One of the top-rated finance apps on both Google Play and the App Store, so a winning idea could reach millions of people. Money matters touch everyone, and we believe AI can play a key role in improving financial literacy — especially among young adults.
-
-About the Company S-Bank is Finland’s fourth-largest bank, serving 3.5 million customers nationwide. Our mission is to make everyday banking simple, rewarding, and accessible to everyone. We believe in combining strong financial expertise with innovative technology to create solutions that genuinely improve people’s lives. Junction offers us a unique opportunity to co-create with some of the world’s brightest developers and to explore new ways AI can reshape personal finance."
-
----
-
-## What we've built so far
-
-A chat backend for the finance coach. Claude does the coaching. Web search through [Exa](https://exa.ai) is an **optional** extra for outside information (Statistics Finland benchmarks, prices, interest rates, Kela, taxes) and is **off by default**.
+## How it works
 
 ```mermaid
 flowchart LR
-    U["Customer"] --> CLI["coach/__main__.py<br/>terminal chat for testing"]
-    CLI --> A["coach/agent.py<br/>chat() loop + system prompt"]
-    A <-->|"Anthropic SDK"| C["Claude Opus 5.5"]
-    A -.->|"only if COACH_WEB_SEARCH=1"| W["coach/web_search.py"]
-    W <-.->|"exa-py SDK"| E["Exa web search"]
+    U["Customer<br/>mobile web app"] --> API["Coach backend"]
+
+    subgraph EU["Verda (EU data centres)"]
+        G["Gemma 4<br/>open model"]
+    end
+
+    API <-->|"chat + tool calls"| G
+    API <-->|"queries for this customer only"| DB[("Aiven PostgreSQL<br/>3.6M transactions")]
+    API <-->|"what-if calculations"| SB["Modal Sandbox"]
+    API -.->|"optional"| EXA["Web search<br/>(public benchmarks)"]
 ```
 
-| File | Purpose |
-|---|---|
-| `coach/agent.py` | The coach: system prompt (three spending baskets) and the chat loop that talks to Claude |
-| `coach/web_search.py` | Optional Exa tools (`web_search`, `get_contents`) plus the prompt text that tells Claude when to use them |
-| `coach/__main__.py` | Terminal chat for trying the coach: `python -m coach` |
-| `requirements.txt` | Python dependencies (`exa-py` is only needed with web search) |
-| `.env.example` | Template for API keys and settings |
-
-### How one chat turn works
-
-`chat(messages)` sends the conversation to Claude. If Claude asks for a tool, such as a web search, the loop runs the tool, sends the result back, and repeats until Claude gives a final answer (at most 10 rounds).
+When a customer asks a question, the AI model decides which data it needs, queries **only that customer's** transactions, runs any calculation in a secure sandbox, and explains the result in plain language. It never sees the full dataset.
 
 ```mermaid
 sequenceDiagram
     participant U as Customer
-    participant A as agent.chat()
-    participant C as Claude
-    participant E as Exa (optional)
+    participant A as Coach
+    participant D as Transactions DB
+    participant M as Calculation sandbox
 
-    U->>A: "How does my grocery spend compare to other Finns?"
-    A->>C: conversation + system prompt + tools
-    alt Claude needs outside info (web search enabled)
-        C-->>A: tool_use: web_search(query, objective)
-        A->>E: search (no personal data in the query)
-        E-->>A: results with highlights and URLs
-        A->>C: tool_result
-        C-->>A: final answer citing sources
-    else Answer from conversation alone
-        C-->>A: final answer
-    end
-    A-->>U: reply text
+    U->>A: "How much could I save if I cut dining out by 20%?"
+    A->>D: restaurant spending, last 6 months
+    D-->>A: monthly totals
+    A->>M: compute 20% of the average
+    M-->>A: "€47/month, €564/year"
+    A-->>U: plain-language answer with the numbers
 ```
 
-### Web search on or off
+## Built with
 
-```mermaid
-flowchart TD
-    S["App starts"] --> Q{"COACH_WEB_SEARCH=1<br/>and EXA_API_KEY set?"}
-    Q -->|"Yes"| Y["Claude gets web_search + get_contents<br/>and a 'search sparingly' prompt section"]
-    Q -->|"No (default)"| N["Claude gets no tools<br/>exa-py is never imported"]
-```
+| Technology | Role |
+|---|---|
+| **Gemma 4** on **Verda** | The coach's AI model, self-hosted in EU data centres *(in progress)* |
+| **Aiven PostgreSQL** | The S-Pankki synthetic dataset: 5,100 customers, 3.6M transactions |
+| **Modal** | Secure sandboxes for what-if and safe-to-spend calculations *(planned)* |
+| **Claude** | Development and quality baseline |
+| **Exa** | Optional web search for public benchmarks |
 
-The search prompt tells Claude to search only when outside facts genuinely help, to prefer official Finnish sources and cite URLs, and **never to put a customer's personal or financial details into a search query**.
+More detail: [TECH_STACK.md](TECH_STACK.md)
 
-## Setup
+## Running it
 
-Requires Python 3.10+.
+See [SETUP.md](SETUP.md).
 
-1. Create a virtual environment and install dependencies:
-   ```bash
-   python3 -m venv .venv
-   .venv/bin/pip install -r requirements.txt
-   ```
-2. Create your env file:
-   ```bash
-   cp .env.example .env
-   ```
-3. In `.env`, set `ANTHROPIC_API_KEY` (get one at [console.anthropic.com](https://console.anthropic.com)). Usage is billed per request.
-4. Optional web search: set `COACH_WEB_SEARCH=1` and `EXA_API_KEY` (from [dashboard.exa.ai](https://dashboard.exa.ai)).
-5. Try it:
-   ```bash
-   .venv/bin/python -m coach
-   ```
+## Team
 
-> **Never commit `.env` or share keys in chat.** `.env` and `.venv/` are already in `.gitignore`. If a key leaks, revoke it in that service's console.
-
-## Next steps
-
-- Add tools that let Claude query the synthetic transaction dataset, registered next to the Exa tools in `coach/agent.py`.
-- Wrap `chat()` in a web API (e.g. FastAPI) for the mobile front end.
+Mountain Claude Boys, Junction 2026.

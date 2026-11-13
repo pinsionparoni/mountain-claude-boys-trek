@@ -80,13 +80,14 @@ Source: [hackjunction/Junction-2026-S-pankki](https://github.com/hackjunction/Ju
 
 | File | Contents |
 |---|---|
-| `tx_junction_transactions.csv` | ~363 MB, about 3.6M transactions (estimated), Git LFS |
+| `tx_junction_transactions.csv` | 363 MB, 3,626,755 transactions, Oct 2024 – Sep 2026, Git LFS |
 | `tx_customers_junction.csv` | 5,100 customers: postal code, age |
-| `mtg_negotiation_history.csv` | Mortgage application events |
-| `mtg_tx_customer_link_and_final_mtg_infio.csv` | Mortgage ↔ customer link and outcomes |
+| `mtg_negotiation_history.csv` | 3,452 mortgage application events (Jan – Sep 2026) |
+| `mtg_tx_customer_link_and_final_mtg_infio.csv` | 200 mortgage applications: customer link and final outcomes |
 
 - Transaction columns: `customer_id, bank_account_id, tx_date, tx_timestamp, category, tx_amount_eur, balance_after_eur, transaction_type, merchant_id, mcc_code`.
-- Categories already exist (Groceries, Restaurants, Utilities, Housing, Salary, Health, Entertainment, Transportation, Lifestyle, Travel, Home & Tech, Invest Deposit).
+- 15 categories already exist: Groceries, Restaurants, Transportation, Utilities, Entertainment, Health, Salary, Home & Tech, Housing, Lifestyle, Travel, Invest Deposit, Other Income, Salary Sweep, Invest Withdraw.
+- Loaded with `scripts/load_data.py`: tables `customers`, `transactions`, `mortgage_outcomes`, `mortgage_events`, indexed by customer and date. The database takes **628 MB** including indexes, on an Aiven Developer-1 plan (8 GB storage) in Frankfurt. A per-customer query takes under a millisecond in the database, about 50–100 ms from a laptop including network.
 - The CSVs start with a UTF-8 BOM: read with `utf-8-sig`.
 - The transactions file is in Git LFS: clone with `git lfs install` first, or GitHub's "Download ZIP" may give only a pointer file.
 - **Three baskets** come mostly from rules on `category` and `transaction_type` (e.g. Housing, Utilities → mandatory regular; Restaurants, Entertainment → everyday), with the model handling edge cases like Health or Home & Tech.
@@ -123,7 +124,7 @@ Source: [hackjunction/Junction-2026-S-pankki](https://github.com/hackjunction/Ju
 
 ## Build order
 
-1. **Data:** load the CSVs into PostgreSQL (local first, then Aiven).
+1. **Data:** ✅ done. Aiven PostgreSQL 18 (Frankfurt, Developer-1 plan) loaded with all 3.6M transactions via `scripts/load_data.py`.
 2. **Tools:** give the coach 2–3 database tools (spending by category and period, basket summary, balance trend), scoped to one customer.
 3. **Model switch:** make the model a setting; run the same 10–20 questions from the brief through Claude and Gemma 4 to compare.
 4. **Gemma on Verda:** deploy the vLLM container, point the coach at it.
@@ -139,6 +140,7 @@ The S-Pankki challenge is the main prize: a polished coach beats many half-worki
 - [ ] Verda container GPU types, prices and data-centre countries. (Verda booth)
 - [ ] Is Gemma 4 26B / 31B reliable enough at tool calls? (Test in step 3)
 - [ ] Gemma challenge submission requirements. (Google DeepMind booth / Discord)
+- [ ] Are "Salary Sweep" and "Invest Withdraw" transfers between accounts rather than spending? (S-Bank data scientist mentor)
 - [ ] Who on the team owns which component?
 
 ## Submission checklist
