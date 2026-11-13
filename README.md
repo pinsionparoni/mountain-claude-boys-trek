@@ -1,6 +1,6 @@
 # mountain-claude-boys-trek
 Junction 2026 project repo for Mountain Claude Boys team
-This project is for the Junction 2026 S-Pankki challenge
+This project is for the Junction 2026 S-Pankki challenge. Full challenge description: [CHALLENGE.md](CHALLENGE.md). Tech stack plan: [TECH_STACK.md](TECH_STACK.md)
 
 From the challenge description:
 
