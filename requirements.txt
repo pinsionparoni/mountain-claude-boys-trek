@@ -1,0 +1,5 @@
+anthropic>=2.8.0
+python-dotenv
+
+# Optional, only needed with COACH_WEB_SEARCH=1
+exa-py>=2.28.0
