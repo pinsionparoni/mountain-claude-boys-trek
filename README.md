@@ -21,6 +21,7 @@ Full brief: [CHALLENGE.md](CHALLENGE.md)
 - **"What kind of spender am I?":** compares your spending with people your age (Statistics Finland's age bands) and with everyone, per category and per basket: "you spend less on travel than 85% of people aged 18–24". Only medians and ranks are used, never another customer's data.
 - **Safe to save and what-ifs:** how much you could put aside each month, and what a change would mean ("how much could I save if I cut dining out by 20%?").
 - **Explains money words** in plain language (*hätävara*, *korko*, *e-lasku*), without lecturing.
+- **Explore your own data:** ask what no fixed view covers: *"do I spend more at weekends?"*, *"what would skipping Friday restaurant visits save in a year?"*, *"what time of day do I shop the most?"*. The coach writes a few lines of code over **your** transactions, which run in an isolated **Modal Sandbox** in the EU (no network, nothing but your data). The computer does the arithmetic, and the answer says in one sentence what was counted and over which period. The common questions (safe to spend, what-ifs, comparisons) stay on fixed, tested formulas.
 - **Charts when you want them:** in the spirit of MyData, you explore your own data by asking, not through charts the bank picked. When an answer has a fitting chart ("where did my money go last month?", "has my restaurant spending gone up?", "how does my food spending compare to people my age?"), a **📊 Näytä kaaviona** button appears under the finished answer: spending by category, a monthly trend, your balance, your budget, or you against people your age and the Finnish average. Ask for a chart ("näytä kaaviona", "piirrä") and it opens straight away. The AI only chooses the chart; every number in it is computed from your data.
 - **Talousneuvoja on the home screen:** one tip picked by fixed rules from your own data (cash tight before payday, over budget, clearly above the Finnish average on restaurants or entertainment, budget nearly used, or on track), with its chart and a button that asks the coach the follow-up question.
 - **Safe by design:** a quick check before every answer sorts the question ([POLICY.md](POLICY.md)): money questions are answered, people in trouble (gambling, debt, distress) get a kind pointer to help, and harmful or off-topic requests are politely declined. No personal investment, loan or tax recommendations.
@@ -43,10 +44,11 @@ flowchart LR
     API <-->|"chat + tool calls"| G
     API <-->|"queries for this customer only"| DB[("Aiven PostgreSQL<br/>3.6M transactions")]
     API --- CALC["Calculations in code<br/>(never the AI)"]
+    API <-->|"open questions:<br/>model-written code"| SB["Modal Sandbox (EU)<br/>no network, one customer"]
     API -.->|"optional"| EXA["Web search<br/>(public benchmarks)"]
 ```
 
-When a customer asks a question, the AI model decides which data it needs, queries **only that customer's** transactions, computes any figures in ordinary code, and explains the result in plain language. It never sees the full dataset.
+When a customer asks a question, the AI model decides which data it needs, queries **only that customer's** transactions, computes any figures in ordinary code (for open questions, code the model writes, run in an isolated sandbox), and explains the result in plain language. It never sees the full dataset.
 
 ```mermaid
 sequenceDiagram
@@ -73,6 +75,7 @@ We want to be exact about this, because keeping customer data in Europe is part 
 | 2. **Coach server** (FastAPI on Modal) | **EU** (Modal `region="eu"`; 12.6 ms to the database in Frankfurt) | Runs the tools and calculations. Conversations are kept in memory only, and lost when the server sleeps or restarts. |
 | 3. **Database** (Aiven PostgreSQL) | **EU**: Frankfurt, Germany | All transactions, at rest. Read-only for the coach, one customer at a time. |
 | 4. **AI model** (Gemma 4 on Verda) | **EU**: Finland (Verda, a Finnish GPU cloud) | The conversation and the customer's figures from the tools: what the model needs to answer. |
+| 5. **Calculation sandbox** (Modal Sandbox) | **EU** (Modal `region="eu"`) | Only for open questions ("explore my data"): one customer's last 12 months of transactions and the model's few lines of code. No network, no keys; the sandbox is deleted after each calculation. Started by our server, so it never passes through the web gateway. |
 | Not used in the demo | Claude API (US; development only, `COACH_MODEL=claude`) and Exa web search (US; off, and never sent personal data) | Nothing |
 
 In short: **the data is stored, processed and handled by the AI model in the EU, but requests from the phone reach our server through Modal's web gateway in the US**, encrypted. That hop comes from how we host the hackathon demo; in S-mobiili the coach would run on S-Bank's own infrastructure. The data is S-Pankki's synthetic dataset. More in [TECH_STACK.md](TECH_STACK.md#where-the-data-goes).
@@ -83,7 +86,7 @@ In short: **the data is stored, processed and handled by the AI model in the EU,
 |---|---|
 | **Gemma 4 31B** on **Verda** | The coach's AI model, self-hosted with vLLM on an H100 |
 | **Aiven PostgreSQL** | The S-Pankki synthetic dataset: 5,100 customers, 3.6M transactions |
-| **Modal** | Hosts the demo app and coach API in its EU region |
+| **Modal** | Hosts the demo app and coach API in its EU region; **Sandboxes** run the coach's own calculations for open questions, isolated and in the EU |
 | **Claude** | Development and quality baseline |
 | **Statistics Finland** open data | Household spending by age (StatFin tables 14q4, 14q9) and the consumer price index (11xs), CC BY 4.0. Source: Statistics Finland |
 | **Exa** | Optional web search for public benchmarks |

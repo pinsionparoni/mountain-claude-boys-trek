@@ -221,6 +221,7 @@ export const text = {
       get_transactions: "Finding your transactions…",
       calculate_safe_to_save: "Calculating what you could save…",
       calculate_what_if: "Calculating the what-if…",
+      explore_my_data: "Calculating from your transactions…",
     } as Record<string, string>,
   },
   fi: {
@@ -426,6 +427,7 @@ export const text = {
       get_transactions: "Haetaan tilitapahtumiasi…",
       calculate_safe_to_save: "Lasketaan säästömahdollisuutta…",
       calculate_what_if: "Lasketaan entä jos -laskelmaa…",
+      explore_my_data: "Lasketaan tapahtumistasi…",
     } as Record<string, string>,
   },
 };

@@ -15,7 +15,7 @@ from datetime import date
 
 from dotenv import load_dotenv
 
-from coach import budget, charts, guardrail, web_search
+from coach import budget, charts, explore, guardrail, web_search
 from coach.database import queries
 from coach.tools import spending
 
@@ -280,6 +280,9 @@ def _prepare(customer_id):
         )
         system += spending.PROMPT
         tools += spending.load_tools(customer_id, today)
+        if explore.enabled():
+            system += explore.PROMPT
+            tools += explore.load_tools(customer_id, today)
     if web_search.enabled():
         system += web_search.PROMPT
     return system, tools
