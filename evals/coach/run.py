@@ -13,6 +13,9 @@ Run the coach test set (cases.json) on one model and score every answer.
     # Only some cases, or a name for the run:
     .venv/bin/python -m evals.coach.run --only budget-fi-1 drugs-fi-1 --name gemma-finetuned
 
+Each run also writes review.csv: one row per answer, for checking by hand in Excel or
+Google Sheets (fill in the "agree" and "comment" columns).
+
 Always use COACH_TODAY=2026-09-10: the expected numbers in cases.json are for that date.
 Compare runs with evals.coach.compare. Results go to evals/coach/results/ (not in git).
 
@@ -21,6 +24,7 @@ These cases are the TEST set: never use them, or answers to them, as training da
 """
 
 import argparse
+import csv
 import json
 import math
 import os
@@ -130,10 +134,41 @@ def rescore(folder):
     save(rows, folder, old["name"], old["model"], old["guardrail"])
 
 
+def describe(must):
+    """The case's rules in plain words, for the review sheet."""
+    parts = []
+    if must.get("tools_any"):
+        parts.append("use one of: " + ", ".join(must["tools_any"]))
+    if must.get("numbers"):
+        parts.append("say " + ", ".join(f"{n} €" for n in must["numbers"]))
+    if must.get("mention_any"):
+        parts.append("mention one of: " + ", ".join(must["mention_any"]))
+    if must.get("refused"):
+        parts.append("decline")
+    if must.get("care"):
+        parts.append("point to help")
+    if must.get("not_refused"):
+        parts.append("answer (not decline)")
+    return "; ".join(parts) + ("; " if parts else "") + "no internal names; Finnish without errors (fi)"
+
+
+def write_review_sheet(rows, folder):
+    # utf-8-sig so Excel shows ä and ö correctly.
+    with open(folder / "review.csv", "w", newline="", encoding="utf-8-sig") as f:
+        w = csv.writer(f)
+        w.writerow(["id", "group", "lang", "customer_id", "question", "must", "model", "answer",
+                    "result", "why_failed", "agree (y/n)", "comment"])
+        for r in rows:
+            w.writerow([r["id"], r["group"], r["lang"], r["customer_id"], r["question"], describe(r["must"]),
+                        r.get("model"), r["answer"], "PASS" if r["passed"] else "FAIL",
+                        "; ".join(r.get("notes", [])), "", ""])
+
+
 def save(rows, folder, name, model, guard):
     with open(folder / "answers.jsonl", "w", encoding="utf-8") as f:
         for r in rows:
             f.write(json.dumps(r, ensure_ascii=False, default=str) + "\n")
+    write_review_sheet(rows, folder)
 
     by_group = defaultdict(list)
     for r in rows:
