@@ -2,7 +2,7 @@
 
 Plan for our S-Pankki **Personal Economic Trainer** ([CHALLENGE.md](CHALLENGE.md)), combined with several Junction 2026 tech challenges.
 
-> **Status:** in progress. Items marked ⚠️ are not verified yet. Setup details for developers are in [SETUP.md](SETUP.md).
+> **Status:** working demo hosted on Modal; docs updated Nov 14 (charts on request, calculations in code). Items marked ⚠️ are not verified yet. Setup details for developers are in [SETUP.md](SETUP.md).
 > ⚠️ We heard teams can enter as many tech challenges as they like. Confirm with the organisers.
 
 ## Pitch in one line
@@ -17,7 +17,7 @@ An AI money coach that keeps customer data in Europe on open models, and **compu
 | Core | **Verda** | Hosts our open models (Gemma, possibly Nemotron) in EU data centres, so customer data never goes to an outside AI API | $10k / $2.5k / $2.5k credits |
 | Core | **Gemma** | Gemma 4 is the coach's brain: chat, tool calls, explanations | €1,000 × 3 teams |
 | Core | **Aiven** | PostgreSQL holds the transaction dataset; the coach queries it with tools | €1,000 / €750 / €500 |
-| Core | **Modal** | Secure Sandboxes run the calculation code for what-if questions, so numbers are exact | $2,000 + $3,000 credits |
+| Core | **Modal** | Hosts the demo app and coach API in its EU region. (Sandboxes for calculations were the first idea; not built, see Calculations below) | $2,000 + $3,000 credits |
 | Add-on | **Nemotron** | Reads receipt and bill photos and files them into the right basket | 2 × RTX 5080 |
 | Add-on | **CRACI** | Our GitHub Actions CI runs on `runs-on: craci` | LEGO sets |
 | Add-on | **Codex** | Only if a teammate builds part of the project with Codex | $10k / $5k / $2.5k API credits |
@@ -39,7 +39,7 @@ flowchart LR
     API <-->|"chat + tool calls"| G
     API -.->|"receipt photo"| N
     API <-->|"SQL tools"| DB[("Aiven PostgreSQL<br/>transactions")]
-    API <-->|"what-if code"| SB["Modal Sandbox"]
+    API --- CALC["coach/calculations.py<br/>budget.py, peers.py"]
     API -.->|"optional"| EXA["Exa web search"]
     API -.->|"dev / comparison"| C["Claude API"]
 ```
@@ -54,16 +54,17 @@ sequenceDiagram
     participant A as Coach backend
     participant G as Gemma 4 on Verda
     participant D as Aiven PostgreSQL
-    participant M as Modal Sandbox
+    participant M as coach/calculations.py
 
     U->>A: "How much could I save if I cut dining out by 20%?"
+    A->>A: guardrail: allowed question?
     A->>G: conversation + tools
-    G-->>A: tool call: spending_summary(Restaurants, last 12 months)
+    G-->>A: tool call: get_spending_by_category(Restaurants, last 6 months)
     A->>D: SQL query for this customer only
-    D-->>A: monthly totals
+    D-->>A: totals and monthly average
     A->>G: tool result
-    G-->>A: tool call: run_calculation(python code)
-    A->>M: run code in sandbox
+    G-->>A: tool call: calculate_what_if(Restaurants: average, cut 20%)
+    A->>M: compute the saving
     M-->>A: "€47/month, €564/year"
     A->>G: tool result
     G-->>A: plain-language answer with the numbers
@@ -90,7 +91,7 @@ Source: [hackjunction/Junction-2026-S-pankki](https://github.com/hackjunction/Ju
 - Loaded with `scripts/load_data.py`: tables `customers`, `transactions`, `mortgage_outcomes`, `mortgage_events`, indexed by customer and date. The database takes **628 MB** including indexes, on an Aiven Developer-1 plan (8 GB storage) in Frankfurt. A per-customer query takes under a millisecond in the database, about 50–100 ms from a laptop including network.
 - The CSVs start with a UTF-8 BOM: read with `utf-8-sig`.
 - The transactions file is in Git LFS: clone with `git lfs install` first, or GitHub's "Download ZIP" may give only a pointer file.
-- **Three baskets** come from a category mapping in `coach/db.py` (draft: Housing, Utilities, Groceries, Transportation → mandatory regular; Health, Home & Tech → mandatory irregular; Restaurants, Entertainment, Lifestyle, Travel → everyday; income, savings and transfers are not spending). Merchant codes split categories further, e.g. Transportation → taxi, fuel, parking, public transport.
+- **Three baskets** come from merchant-type rules in `coach/spending_baskets.py`: each purchase is placed by its merchant code (MCC), not just its category, so a taxi and a bus ticket land in different baskets. Rules and open questions: [BASKETS.md](BASKETS.md).
 
 ### Coach model: Gemma 4 on Verda
 
@@ -107,10 +108,11 @@ Source: [hackjunction/Junction-2026-S-pankki](https://github.com/hackjunction/Ju
 - Kept for development and as a quality baseline to test Gemma against.
 - Budget: $20 of Claude credits per person.
 
-### Calculations: Modal Sandboxes
+### Calculations: in code, never the AI
 
-- The coach writes short Python for what-if and safe-to-spend maths; it runs in an isolated Modal Sandbox and returns exact numbers.
-- Modal also hosts the demo backend and app (see [SETUP.md § 12](SETUP.md#12-hosted-demo-on-modal) and "Where the data goes" below), pinned to Modal's EU region.
+- Every number comes from plain Python: `coach/calculations.py` (what-ifs, safe to save, differences; standard library only), `coach/budget.py` (monthly budget, safe to spend this week) and `coach/peers.py` (comparisons). The tools return finished figures and the model only explains them, so it never does arithmetic.
+- The first plan was for the model to write Python that runs in a Modal Sandbox. We chose fixed, tested functions instead: same exact numbers, no model-written code to run, and every formula covered by tests. `calculations.py` has no dependencies, so it could still run in a sandbox unchanged.
+- Modal hosts the demo backend and app (see [SETUP.md § 12](SETUP.md#12-hosted-demo-on-modal) and "Where the data goes" below), pinned to Modal's EU region.
 
 ### Receipts: Nemotron 3.5 Super VL (add-on)
 
@@ -128,8 +130,9 @@ Source: [hackjunction/Junction-2026-S-pankki](https://github.com/hackjunction/Ju
 
 ### Charts in the chat
 
+- **Charts on request (MyData):** charts are never drawn by default. When an answer has a fitting chart, the app shows a **📊 Näytä kaaviona** button under the finished answer; questions that ask for a picture ("kaavio", "piirrä", "chart"…) open it straight away above the text. Answers stand on their own and never point to a chart.
 - The `show_chart` tool lets the model pick a chart when an answer compares numbers: spending by category, a monthly trend (category, basket or all), the balance, the budget per basket, or the customer against people their age (all categories, or one in detail with the Finnish average).
-- The model never writes numbers into a chart: `coach/charts.py` computes them from the query layer, the agent passes the chart on as a `chart` stream event, and `frontend/src/components/ChatChart.tsx` draws it above the answer.
+- The model never writes numbers into a chart: `coach/charts.py` computes them from the query layer, the agent passes the chart on as a `chart` stream event, and `frontend/src/components/ChatChart.tsx` draws it when the customer asks. If the model picked no chart, `charts.offer_args` offers one that matches the turn's lookups (spending by category or one category's trend, balance, budget, peers); nothing is offered for definitions, what-ifs or single purchases.
 - Drawn with plain HTML/SVG (no chart library), one S-Pankki green and a validated grey, sparing labels, hover values and a hidden table for screen readers.
 
 ### Optional: Exa web search
@@ -157,11 +160,12 @@ The hosted demo (https://arvon-johannes--financial-coach.modal.run) stores and p
 
 1. **Data:** ✅ done. Aiven PostgreSQL 18 (Frankfurt, Developer-1 plan) loaded with all 3.6M transactions via `scripts/load_data.py`.
 2. **Tools:** ✅ done. Nine customer-scoped tools in `coach/tools/spending.py`, on a read-only query layer (`coach/database/queries.py`) and the basket rules (`coach/spending_baskets.py`), including safe-to-spend, the peer comparison and charts.
-3. **Model switch:** ✅ done. `COACH_MODEL=gemma|claude`. Next: a fixed set of 10–20 questions from the brief to compare models and catch regressions.
+3. **Model switch:** ✅ done. `COACH_MODEL=gemma|claude`.
+3b. **Safety and tests:** ✅ topic policy ([POLICY.md](POLICY.md)) enforced by `coach/guardrail.py` and the prompt; coach test set (`evals/coach/`, hand-written and generated cases) and Finnish language checks (`evals/finnish/`, with a blind native-speaker review); 2,100+ unit tests.
 4. **Gemma on Verda:** ✅ done. `gemma-coach` container running Gemma 4 31B (FP8), tested in English and Finnish.
 4b. **Web API:** ✅ done. FastAPI in `coach/api.py` with a streamed chat (see [SETUP.md § 9](SETUP.md#9-web-api)).
-5. **Calculations:** ✅ done in plain Python (`coach/calculations.py`, `coach/budget.py`, `coach/peers.py`). Next: run them in Modal Sandboxes.
-6. **Front end:** ✅ `frontend/` (React + Vite): S-mobiili mock-up with a restyled login, real receipts, swipeable cards and charts in the chat, English and Finnish; installable on phones and hosted on Modal (SETUP steps 11–12). Polish in progress.
+5. **Calculations:** ✅ done in plain Python (`coach/calculations.py`, `coach/budget.py`, `coach/peers.py`). Modal Sandboxes dropped (see Calculations).
+6. **Front end:** ✅ `frontend/` (React + Vite): S-mobiili mock-up with a restyled login, real receipts, swipeable cards, charts on request in the chat, the Talousneuvoja tip on the home screen, English and Finnish; installable on phones and hosted on Modal (SETUP steps 11–12). Polish in progress.
 6b. **Open data:** ✅ Statistics Finland benchmark in the peer comparison and its charts.
 7. **Add-ons:** Nemotron receipts, CRACI CI, ElevenLabs voice if time allows.
 
