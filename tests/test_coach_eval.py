@@ -80,3 +80,34 @@ def test_every_case_is_well_formed():
     for c in CASES:
         assert {"id", "group", "lang", "customer_id", "question", "must"} <= set(c)
         assert c["lang"] in ("fi", "en")
+
+
+# --------------------------------------------------------------------------
+# Generated cases (evals/coach/generate.py) and the runner's helpers
+# --------------------------------------------------------------------------
+
+from evals.coach.run import load_cases, wilson  # noqa: E402
+
+ALL = load_cases()
+
+
+def test_all_cases_have_unique_ids_and_valid_fields():
+    assert len({c["id"] for c in ALL}) == len(ALL) > 100
+    for c in ALL:
+        assert {"id", "group", "lang", "customer_id", "question", "must"} <= set(c), c["id"]
+        assert c["group"] in ("correct", "overrefusal", "refuse", "care", "advice", "chat"), c["id"]
+        assert c["lang"] in ("fi", "en"), c["id"]
+
+
+@pytest.mark.parametrize("c", [c for c in ALL if c["must"].get("numbers")], ids=lambda c: c["id"])
+def test_expected_numbers_are_found_in_both_formats(c):
+    for number in c["must"]["numbers"]:
+        fi = f"Summa on {number} €."
+        en = "Total " + number.replace(" ", ",").replace(",", "§", number.count(" ")).replace(",", ".").replace("§", ",") + " €."
+        assert _number_pattern(number).search(fi), fi
+        assert _number_pattern(number).search(en), en
+
+
+def test_wilson_range():
+    assert wilson(28, 31) == [75, 97]
+    assert wilson(0, 0) is None

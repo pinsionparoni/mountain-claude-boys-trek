@@ -22,6 +22,7 @@ These cases are the TEST set: never use them, or answers to them, as training da
 
 import argparse
 import json
+import math
 import os
 import sys
 import time
@@ -32,7 +33,8 @@ from pathlib import Path
 from evals.coach.score import score
 
 HERE = Path(__file__).parent
-CASES = HERE / "cases.json"
+CASES = HERE / "cases.json"                  # hand-written
+GENERATED = HERE / "cases_generated.json"    # from generate.py
 RESULTS = HERE / "results"
 
 
@@ -57,6 +59,10 @@ def ask(case):
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--only", nargs="+", metavar="ID", help="run only these case ids")
+    parser.add_argument("--cases", choices=["all", "handwritten", "generated"], default="all",
+                        help="which case files to run (default: all)")
+    parser.add_argument("--repeat", type=int, default=1,
+                        help="ask every case this many times; answers vary between runs")
     parser.add_argument("--name", help="name for this run (default: model and guardrail setting)")
     parser.add_argument("--rescore", type=Path, metavar="FOLDER",
                         help="score a saved run again (after changing the checks), without the model")
@@ -71,7 +77,7 @@ def main(argv=None):
     if os.getenv("COACH_TODAY") != "2026-09-10":
         print("Warning: COACH_TODAY is not 2026-09-10, so expected numbers won't match.", file=sys.stderr)
 
-    cases = json.loads(CASES.read_text(encoding="utf-8"))
+    cases = load_cases(args.cases)
     if args.only:
         cases = [c for c in cases if c["id"] in args.only]
 
@@ -80,7 +86,7 @@ def main(argv=None):
     folder.mkdir(parents=True, exist_ok=True)
 
     rows = []
-    for case in cases:
+    for case in [c for c in cases for _ in range(args.repeat)]:
         print(f"{case['id']:20} ", end="", flush=True)
         try:
             answer, tools, guard, first, total, messages = ask(case)
@@ -94,6 +100,25 @@ def main(argv=None):
                      "model": agent.COACH_MODEL, "error": error, **result, "messages": messages})
 
     save(rows, folder, name, agent.COACH_MODEL, guardrail.enabled())
+
+
+def load_cases(which="all"):
+    cases = []
+    if which in ("all", "handwritten"):
+        cases += json.loads(CASES.read_text(encoding="utf-8"))
+    if which in ("all", "generated") and GENERATED.exists():
+        cases += json.loads(GENERATED.read_text(encoding="utf-8"))["cases"]
+    return cases
+
+
+def wilson(passed, total, z=1.96):
+    """95% range for a pass rate, in percent: how sure we can be with this many cases."""
+    if not total:
+        return None
+    p, d = passed / total, 1 + z * z / total
+    centre = (p + z * z / (2 * total)) / d
+    half = z * math.sqrt(p * (1 - p) / total + z * z / (4 * total * total)) / d
+    return [round(100 * (centre - half)), round(100 * (centre + half))]
 
 
 def rescore(folder):
@@ -122,12 +147,14 @@ def save(rows, folder, name, model, guard):
         "cases": len(rows),
         "passed": sum(r["passed"] for r in rows),
         "groups": {g: [sum(v), len(v)] for g, v in sorted(by_group.items())},
+        "range_95": wilson(sum(r["passed"] for r in rows), len(rows)),
+        "group_ranges_95": {g: wilson(sum(v), len(v)) for g, v in sorted(by_group.items())},
         "median_first_words_s": sorted(firsts)[len(firsts) // 2] if firsts else None,
         "failed_checks": dict(Counter(k for r in rows for k, ok in r["checks"].items() if not ok)),
     }
     (folder / "summary.json").write_text(json.dumps(summary, indent=2, ensure_ascii=False), encoding="utf-8")
 
-    print(f"\n{summary['passed']}/{summary['cases']} passed  "
+    print(f"\n{summary['passed']}/{summary['cases']} passed (95% range {summary['range_95']} %)  "
           + "  ".join(f"{g} {p}/{n}" for g, (p, n) in summary["groups"].items()))
     print(f"Results: {folder}")
 

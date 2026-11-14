@@ -129,7 +129,7 @@ Aim for 1,000–3,000 examples, in both Finnish and English.
 **C. Training data**
 8. Generate draft conversations: run the coach over many customers and *training* questions (not the test questions); save the full conversations.
 9. Fix them: a native speaker corrects the answers in the review sheet, using the glossary and tone, and writes the refusals.
-10. Keep the test questions out of the training data.
+10. Keep the test questions out of the training data: use customers not listed in `evals/coach/cases_generated.json` (`customers`) or `cases.json`, and different question wording.
 
 **D. Train and serve**
 11. Train a LoRA adapter: 1–3 GPU hours on Verda or Modal (Modal Dojo), roughly €10–30. Tools: Hugging Face TRL + PEFT, or Unsloth.

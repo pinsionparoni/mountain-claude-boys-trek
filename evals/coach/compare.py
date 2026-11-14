@@ -29,9 +29,12 @@ def table(folders):
         cells = []
         for r in runs:
             p, n = r["groups"].get(key, [0, 0])
-            cells.append(f"{p}/{n}" if n else "–")
+            span = r.get("group_ranges_95", {}).get(key)
+            cells.append((f"{p}/{n}" + (f" ({span[0]}–{span[1]} %)" if span else "")) if n else "–")
         lines.append(f"| {label} | " + " | ".join(cells) + " |")
-    lines.append("| **All cases** | " + " | ".join(f"**{r['passed']}/{r['cases']}**" for r in runs) + " |")
+    lines.append("| **All cases** | " + " | ".join(
+        f"**{r['passed']}/{r['cases']}**" + (f" ({r['range_95'][0]}–{r['range_95'][1]} %)" if r.get("range_95") else "")
+        for r in runs) + " |")
     lines.append("| Leaked internal names | " + " | ".join(str(r["failed_checks"].get("no_leaks", 0)) for r in runs) + " |")
     lines.append("| Finnish answers with errors | " + " | ".join(str(r["failed_checks"].get("finnish", 0)) for r in runs) + " |")
     lines.append("| Median time to first words | " + " | ".join(
