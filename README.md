@@ -2,7 +2,7 @@
 
 **An AI money coach that lets you chat with your own banking data.** Built by team Mountain Claude Boys for the Junction 2026 S-Pankki challenge, *Personal Economic Trainer*.
 
-> 🚧 Work in progress during the hackathon. This README describes the product for graders and will be finalised before submission.
+> **Status:** working demo, hosted and usable on phones. This README describes the product for the judges; the pitch materials are still in progress.
 
 ## The problem
 
@@ -19,7 +19,11 @@ Full brief: [CHALLENGE.md](CHALLENGE.md)
   3. ☕ Everyday spending / Arjen kulutus (coffees, takeaway, taxis).
 - **A monthly budget and safe to spend this week:** income minus essentials, a reserve for surprises and usual savings gives the everyday budget; the coach tells you what's left this week and checks your account can cover the bills before payday.
 - **"What kind of spender am I?":** compares your spending with people your age (Statistics Finland's age bands) and with everyone, per category and per basket: "you spend less on travel than 85% of people aged 18–24". Only medians and ranks are used, never another customer's data.
-- **Ask, and see it:** in the spirit of MyData, you explore your own data by asking, not through charts the bank picked. When an answer compares numbers ("where did my money go last month?", "has my restaurant spending gone up?", "how does my food spending compare to people my age?"), the coach draws a small chart above its answer: spending by category, a monthly trend, your balance, your budget, or you against people your age and the Finnish average. The AI only chooses the chart; every number in it is computed from your data.
+- **Safe to save and what-ifs:** how much you could put aside each month, and what a change would mean ("how much could I save if I cut dining out by 20%?").
+- **Explains money words** in plain language (*hätävara*, *korko*, *e-lasku*), without lecturing.
+- **Charts when you want them:** in the spirit of MyData, you explore your own data by asking, not through charts the bank picked. When an answer has a fitting chart ("where did my money go last month?", "has my restaurant spending gone up?", "how does my food spending compare to people my age?"), a **📊 Näytä kaaviona** button appears under the finished answer: spending by category, a monthly trend, your balance, your budget, or you against people your age and the Finnish average. Ask for a chart ("näytä kaaviona", "piirrä") and it opens straight away. The AI only chooses the chart; every number in it is computed from your data.
+- **Talousneuvoja on the home screen:** one tip picked by fixed rules from your own data (cash tight before payday, over budget, clearly above the Finnish average on restaurants or entertainment, budget nearly used, or on track), with its chart and a button that asks the coach the follow-up question.
+- **Safe by design:** a quick check before every answer sorts the question ([POLICY.md](POLICY.md)): money questions are answered, people in trouble (gambling, debt, distress) get a kind pointer to help, and harmful or off-topic requests are politely declined. No personal investment, loan or tax recommendations.
 - **Your month at a glance:** swipeable cards above the chat: safe to spend this week, then each basket this month against what your budget expects for it.
 - **Your receipts, in baskets:** the home screen's receipts show your real latest purchases, each placed in its basket (🏠 🔧 ☕), with unusually large ones flagged.
 - **Computes, doesn't guess:** every number comes from code run on your own transactions; the AI only explains it.
@@ -38,18 +42,18 @@ flowchart LR
 
     API <-->|"chat + tool calls"| G
     API <-->|"queries for this customer only"| DB[("Aiven PostgreSQL<br/>3.6M transactions")]
-    API <-->|"what-if calculations"| SB["Modal Sandbox"]
+    API --- CALC["Calculations in code<br/>(never the AI)"]
     API -.->|"optional"| EXA["Web search<br/>(public benchmarks)"]
 ```
 
-When a customer asks a question, the AI model decides which data it needs, queries **only that customer's** transactions, runs any calculation in a secure sandbox, and explains the result in plain language. It never sees the full dataset.
+When a customer asks a question, the AI model decides which data it needs, queries **only that customer's** transactions, computes any figures in ordinary code, and explains the result in plain language. It never sees the full dataset.
 
 ```mermaid
 sequenceDiagram
     participant U as Customer
     participant A as Coach
     participant D as Transactions DB
-    participant M as Calculation sandbox
+    participant M as Calculation code
 
     U->>A: "How much could I save if I cut dining out by 20%?"
     A->>D: restaurant spending, last 6 months
@@ -79,7 +83,7 @@ In short: **the data is stored, processed and handled by the AI model in the EU,
 |---|---|
 | **Gemma 4 31B** on **Verda** | The coach's AI model, self-hosted with vLLM on an H100 |
 | **Aiven PostgreSQL** | The S-Pankki synthetic dataset: 5,100 customers, 3.6M transactions |
-| **Modal** | Hosts the demo app and coach API in its EU region; secure sandboxes for calculations *(planned)* |
+| **Modal** | Hosts the demo app and coach API in its EU region |
 | **Claude** | Development and quality baseline |
 | **Statistics Finland** open data | Household spending by age (StatFin tables 14q4, 14q9) and the consumer price index (11xs), CC BY 4.0. Source: Statistics Finland |
 | **Exa** | Optional web search for public benchmarks |
