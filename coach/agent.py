@@ -15,7 +15,7 @@ from datetime import date
 
 from dotenv import load_dotenv
 
-from coach import budget, guardrail, web_search
+from coach import budget, charts, guardrail, web_search
 from coach.database import queries
 from coach.tools import spending
 
@@ -141,10 +141,21 @@ def _chart(name, output, is_error):
         return None
 
 
+def _offered_chart(by_name, calls):
+    """A chart matching the turn's lookups, when the model didn't pick one (coach/charts.py)."""
+    args = charts.offer_args(calls)
+    tool = by_name.get("show_chart")
+    if args is None or tool is None:
+        return None
+    output, is_error = _run_tool(by_name, "show_chart", args)
+    return _chart("show_chart", output, is_error)
+
+
 def _stream_claude(messages, system, tools):
     """Yield ("tool", name) as Claude calls tools and ("text", answer) at the end."""
     by_name = {t.name: t for t in tools}
     params = {"tools": [dict(t) for t in tools]} if tools else {}
+    calls, charted = [], False   # this turn's successful lookups; did the model pick a chart
     for _ in range(MAX_TURNS):
         response = _client().beta.messages.create(
             model=CLAUDE_MODEL,
@@ -171,6 +182,8 @@ def _stream_claude(messages, system, tools):
             if response.stop_reason == "max_tokens":
                 text += "\n\n(Answer was cut off.)"
             yield "text", text
+            if not charted and (chart := _offered_chart(by_name, calls)) is not None:
+                yield "chart", chart
             return
 
         results = []
@@ -178,7 +191,10 @@ def _stream_claude(messages, system, tools):
             if block.type == "tool_use":
                 yield "tool", block.name
                 output, is_error = _run_tool(by_name, block.name, block.input)
+                if not is_error:
+                    calls.append((block.name, block.input))
                 if (chart := _chart(block.name, output, is_error)) is not None:
+                    charted = True
                     yield "chart", chart
                 results.append({"type": "tool_result", "tool_use_id": block.id,
                                 "content": output, "is_error": is_error})
@@ -191,6 +207,7 @@ def _stream_gemma(messages, system, tools):
     """Yield ("text", chunk) as Gemma writes and ("tool", name) as tools run."""
     by_name = {t.name: t for t in tools}
     params = {"tools": [_to_openai(t) for t in tools]} if tools else {}
+    done, charted = [], False   # this turn's successful lookups; did the model pick a chart
     for _ in range(MAX_TURNS):
         stream = _client().chat.completions.create(
             model=GEMMA_MODEL,
@@ -227,6 +244,8 @@ def _stream_gemma(messages, system, tools):
         if not calls:
             if finish == "length":
                 yield "text", "\n\n(Answer was cut off.)"
+            if not charted and (chart := _offered_chart(by_name, done)) is not None:
+                yield "chart", chart
             return
 
         for call in calls.values():
@@ -237,7 +256,10 @@ def _stream_gemma(messages, system, tools):
                 output = "Error: tool arguments were not valid JSON"
             else:
                 output, is_error = _run_tool(by_name, call["name"], args)
+                if not is_error:
+                    done.append((call["name"], args))
                 if (chart := _chart(call["name"], output, is_error)) is not None:
+                    charted = True
                     yield "chart", chart
             messages.append({"role": "tool", "tool_call_id": call["id"], "content": output})
 

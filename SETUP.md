@@ -164,7 +164,7 @@ First start takes 15–30 minutes (image pull, ~62 GB model download, FP8 compre
 
 ## 6. Modal
 
-Hosts the demo for phones and judges (step 12); planned for the what-if calculation Sandboxes too. Connect your machine once:
+Hosts the demo for phones and judges (step 12). Connect your machine once:
 
 ```bash
 .venv/bin/modal setup        # opens the browser to log in
@@ -202,7 +202,7 @@ Unit tests need no database or model: a fake connection stands in for PostgreSQL
 
 | Endpoint | What it returns |
 |---|---|
-| `POST /chat` | Body `{"customer_id": "CUST00001", "message": "...", "conversation_id": null}`. The answer streamed as server-sent events: `conversation` (`{"conversation_id"}`, send it back with the next message), `tool` (`{"name"}` while the coach looks something up), `chart` (a chart spec from `coach/charts.py` to draw above the answer), `text` (`{"text"}`, pieces of the answer in order), `error`, `done`. |
+| `POST /chat` | Body `{"customer_id": "CUST00001", "message": "...", "conversation_id": null}`. The answer streamed as server-sent events: `conversation` (`{"conversation_id"}`, send it back with the next message), `tool` (`{"name"}` while the coach looks something up), `chart` (a chart spec from `coach/charts.py`; the app offers it behind a "Näytä kaaviona" button, or opens it straight away if the question asked for a chart), `text` (`{"text"}`, pieces of the answer in order), `error`, `done`. |
 | `GET /customers/{id}/summary` | Spending in the three baskets, this month so far by default (`start_date`, `end_date` optional). |
 | `GET /customers/{id}/budget` | The monthly budget and safe to spend this week (same as the coach's `get_safe_to_spend`). |
 | `GET /customers/{id}/receipts` | The latest card purchases up to "today", newest first, each with its merchant type and basket (`limit`, default 30, at most 100). |
@@ -354,14 +354,10 @@ Each tool is bound to the customer the app chose when the tools were created; no
 | `calculate_safe_to_save` | "How much could I save each month?" |
 | `calculate_what_if` | "How much would I save if I cut dining out by 20%?" |
 | `compare_with_peers` | "What kind of spender am I?" The customer against people their age and against all 5,100 customers, over the last 12 complete months: per category and per basket, the monthly amount, the peer median and typical range, and the share of peers who spend less or more. A profile lists the habits that stand out (rent and utilities left out). Where a category maps, also Statistics Finland's average for Finnish households of the same age (open data, `coach/statfin.py`). Only medians and ranks reach the model, never another customer's data. Computed in `coach/peers.py`. |
-| `show_chart` | Not a question but a picture: the coach calls it when its answer compares numbers, and the app draws the chart above the answer. The model picks `kind` (`categories`, `trend`, `balance`, `budget`, `peers`, the last with an optional category for one category in detail) and the period, category or basket; every number is computed in `coach/charts.py`. At most one chart per answer. |
+| `show_chart` | Not a question but a picture: the coach calls it when its answer compares numbers, and the app offers the chart behind a "Näytä kaaviona" button (opened straight away if the customer asked for a chart). If the coach picks none, the agent offers one matching its lookups (`charts.offer_args`). The model picks `kind` (`categories`, `trend`, `balance`, `budget`, `peers`, the last with an optional category for one category in detail) and the period, category or basket; every number is computed in `coach/charts.py`. At most one chart per answer. |
 
 Basket rules: [BASKETS.md](BASKETS.md), implemented in `coach/spending_baskets.py`.
 
 ### How a chat turn works
 
 `chat(messages, customer_id)` builds the system prompt (with the customer's age, data range and balance when a customer is set), sends the conversation to the model with the tools, runs any tool calls, sends the results back, and repeats until there's a final answer (at most 10 rounds).
-
-## Next steps
-
-- Run the calculations in Modal Sandboxes.

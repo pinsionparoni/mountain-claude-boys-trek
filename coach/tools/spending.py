@@ -85,12 +85,13 @@ profile with the ☕ everyday basket. Remember 🏠 includes rent, so a low 🏠
 Spending less than peers does not mean the customer has money to spare: before suggesting they have room to spend, \
 save or treat themselves, call get_safe_to_spend and base the suggestion on it.
 - Charts: when your answer compares or shows several numbers (where money went, a change over months, the balance, \
-the budget, comparisons with people their age), also call show_chart once with the fitting kind, so the customer \
-sees it as a chart just above your answer. At most one chart per answer, none for a single number or small talk. \
+the budget, comparisons with people their age), also call show_chart once with the fitting kind. The app offers it \
+to the customer behind a "show as a chart" button (or opens it at once if they asked for a chart), so the customer \
+decides whether to look: never say where the chart is or that it is shown, and write your answer so it stands on \
+its own, with the key numbers in the text. At most one chart per answer, none for a single number or small talk. \
 Comparing the customer with other people is always a comparison, even for one category: \
 for "how does my food spending compare to people my age?" call show_chart with kind 'peers' and that category. \
-The chart shows the numbers, so mention only the two or three that matter most in your text. \
-If the customer asks for a different view ("show it by month", "as a chart"), call show_chart again.
+If the customer asks for a chart or a different view ("show it as a chart", "by month"), call show_chart.
 - Salary, other income, salary sweeps and investments are money movements, not spending. They are never in the baskets.
 - If get_basket_summary says has_salary_sweep is true, tell the customer that their mandatory totals may be incomplete, \
 using salary_sweep_note (salary_sweep_note_fi in Finnish)."""
@@ -423,7 +424,7 @@ def load_tools(customer_id, today=None):
         else:
             chart = charts.peers(customer_id, today, category=_category(args))
         return {"chart": chart,
-                "note": "The customer now sees this chart just above your answer. Use the same numbers; don't list them all."}
+                "note": "The app offers this chart to the customer. Use the same numbers; don't say where the chart is."}
 
     def peer_comparison(args):
         return peers.compare(customer_id, today)
@@ -513,7 +514,7 @@ def load_tools(customer_id, today=None):
         CoachTool(
             name="show_chart",
             description=(
-                "Show the customer a small chart just above your answer, drawn from their own data. You choose what to "
+                "Offer the customer a small chart with your answer, drawn from their own data. You choose what to "
                 "show; every number is computed for you and returned too. kind: 'categories' (spending per category "
                 "in a period: this month so far, last month, or start_date/end_date), 'trend' (spending per month for "
                 "one category, one basket or everything; the last month is this month so far), 'balance' (end-of-month "
