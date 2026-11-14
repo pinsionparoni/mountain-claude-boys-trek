@@ -9,6 +9,7 @@ export interface Basket {
   total_eur: number;
   share_pct: number;
   transaction_count: number;
+  categories: { category: string; total_eur: number }[];  // largest first
 }
 
 export interface BasketSummary {

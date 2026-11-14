@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { uiConfig } from "./config/ui.config";
-import { BasketOverview } from "./components/BasketOverview";
+import { BasketCard } from "./components/BasketCard";
 import { BottomNav, type Tab } from "./components/BottomNav";
+import { CardCarousel } from "./components/CardCarousel";
 import { Chat } from "./components/Chat";
 import { EtukorttiPage } from "./components/EtukorttiPage";
 import { BackIcon } from "./components/Icons";
@@ -15,7 +16,16 @@ import { SmobiiliHome } from "./components/SmobiiliHome";
 import { demoCustomers } from "./fixtures/demo";
 import { PasscodeError, checkPasscode, fetchBudget, fetchHealth, fetchReceipts, fetchSummary, rememberPasscode } from "./lib/api";
 import { formatDay, text, type Lang } from "./lib/i18n";
-import type { BasketSummary, Budget, Receipts } from "./lib/types";
+import type { BasketKey, BasketSummary, Budget, Receipts } from "./lib/types";
+
+const BASKETS: BasketKey[] = ["regular_essentials", "unexpected_necessities", "everyday_spending"];
+
+/** What a basket's spending this month is measured against, from the monthly budget. */
+const basketReference = (key: BasketKey, budget: Budget) => ({
+  regular_essentials: budget.monthly_budget.regular_essentials,
+  unexpected_necessities: budget.monthly_budget.unexpected_reserve,
+  everyday_spending: budget.this_month.everyday_budget,
+})[key];
 
 const LANG_KEY = "coach-lang";
 
@@ -148,16 +158,16 @@ export default function App() {
                 </header>
                 <Chat key={customerId} customerId={customerId} t={t} showSuggestions={uiConfig.showSuggestionChips}>
                   {!error && !budget && <p className="panel muted">{t.loading}</p>}
-                  {budget && <SafeToSpendCard budget={budget} t={t} lang={lang} />}
-                  {uiConfig.showBasketOverview && summary && (
-                    <BasketOverview
-                      summary={summary}
-                      periodLabel={periodLabel(summary.period, lang)}
-                      showBars={uiConfig.showSpendingChart && uiConfig.chartStyle === "bars"}
-                      t={t}
-                      lang={lang}
-                    />
-                  )}
+                  <CardCarousel t={t}>
+                    {budget && <SafeToSpendCard budget={budget} t={t} lang={lang} />}
+                    {uiConfig.showBasketOverview && summary && budget && BASKETS.map((key) => (
+                      <BasketCard key={key} basketKey={key} basket={summary.baskets[key]}
+                                  reference={basketReference(key, budget)}
+                                  periodLabel={periodLabel(summary.period, lang)}
+                                  showBar={uiConfig.showSpendingChart && uiConfig.chartStyle === "bars"}
+                                  t={t} lang={lang} />
+                    ))}
+                  </CardCarousel>
                 </Chat>
               </div>
             </>

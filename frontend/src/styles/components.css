@@ -825,3 +825,74 @@ html, body, #root { block-size: 100%; overflow: hidden; }
 .sm-login { grid-template-columns: minmax(0, 1fr); }
 .sm-login-form { grid-template-columns: minmax(0, 1fr); min-inline-size: 0; }
 .sm-login-field select { inline-size: 100%; }
+
+/* ------------------------------------------------------------------------
+   Coach screen: swipeable cards (safe to spend, then one per basket) with
+   S-mobiili's grey dots. Scroll snapping does the swiping.
+   ------------------------------------------------------------------------ */
+
+.carousel { display: grid; gap: var(--sp-space-3); min-inline-size: 0; }
+.carousel-track {
+  display: flex;
+  gap: var(--sp-space-3);
+  overflow-x: auto;
+  overscroll-behavior-x: contain;   /* a swipe moves the cards, not the page */
+  scroll-snap-type: x mandatory;
+  scroll-behavior: smooth;
+  scrollbar-width: none;
+  border-radius: 16px;
+}
+.carousel-track::-webkit-scrollbar { display: none; }
+.carousel-track:focus-visible { outline: var(--sp-focus-width) solid var(--sp-focus-color); outline-offset: var(--sp-focus-offset); }
+.carousel-slide { flex: 0 0 100%; display: grid; scroll-snap-align: start; scroll-snap-stop: always; min-inline-size: 0; }
+.carousel-slide > .panel { block-size: 100%; align-content: start; }
+@media (prefers-reduced-motion: reduce) { .carousel-track { scroll-behavior: auto; } }
+
+/* Dots: 8 px like the home screen's, inside a 24 px tap target. */
+.carousel-dots { justify-content: center; gap: 0; }
+.carousel-dots button {
+  display: grid;
+  place-items: center;
+  inline-size: 24px;
+  block-size: 24px;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+}
+.carousel-dots button::before {
+  content: "";
+  inline-size: 8px;
+  block-size: 8px;
+  border-radius: 50%;
+  background: var(--sp-border-subtle);
+  transition: background-color var(--sp-duration-fast) var(--sp-ease-default), transform var(--sp-duration-fast) var(--sp-ease-default);
+}
+.carousel-dots button.on::before { background: var(--sp-neutral-secondary); transform: scale(1.15); }
+.carousel-dots button:focus-visible { outline: var(--sp-focus-width) solid var(--sp-focus-color); outline-offset: -2px; border-radius: 50%; }
+
+/* Basket cards */
+.sm-coach .basket-card { background: var(--sp-white); }
+.basket-card-title { display: flex; align-items: center; gap: var(--sp-space-2); }
+.basket-card-icon {
+  display: grid;
+  place-items: center;
+  inline-size: 32px;
+  block-size: 32px;
+  border-radius: 50%;
+  background: var(--sp-green-pale);
+  font-size: 1rem;
+}
+.basket-card-period { font-size: var(--sp-font-size-small); }
+.basket-card-bar { block-size: 8px; border-radius: var(--sp-radius-pill); background: var(--sp-green-pale); overflow: hidden; }
+.basket-card-bar-fill {
+  block-size: 100%;
+  border-radius: inherit;
+  background: var(--sp-green-medium);
+  transition: inline-size var(--sp-duration-slow) var(--sp-ease-entry);
+}
+.basket-card-bar.is-over .basket-card-bar-fill { background: var(--sp-error-text); }
+.basket-card-ref { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 2px var(--sp-space-3); font-size: var(--sp-font-size-small); }
+.basket-card-over { color: var(--sp-error-text); font-weight: var(--sp-weight-medium); }
+.basket-card-cats { display: grid; gap: 6px; margin: var(--sp-space-1) 0 0; padding: var(--sp-space-3) 0 0; list-style: none; border-block-start: 1px solid var(--sp-border-subtle); }
+.basket-card-cats li { display: flex; justify-content: space-between; gap: var(--sp-space-3); font-size: 0.95rem; }
