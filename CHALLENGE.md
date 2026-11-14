@@ -50,9 +50,7 @@ Benchmarking personal data against open population data is encouraged but not ma
 
 ### Data
 
-A large synthetic transaction dataset modelled on the structure of S-Bank data.
-
-> TODO: add the link to the dataset (it was missing from the copied description).
+A large synthetic transaction dataset modelled on the structure of S-Bank data: [hackjunction/Junction-2026-S-pankki](https://github.com/hackjunction/Junction-2026-S-pankki). See [SETUP.md](SETUP.md) for how we load it.
 
 ### Mentors
 
@@ -60,3 +58,27 @@ A large synthetic transaction dataset modelled on the structure of S-Bank data.
 - Representative from S-Bank IT / AI development
 - Data Scientist (transaction data expert)
 - 1–2 business representatives who own the customer problem
+
+## Company Info
+
+**S-Pankki** – [www.s-pankki.fi](https://www.s-pankki.fi/)
+
+## Judging Criteria
+
+Each criterion counts equally.
+
+| Criterion | Weight |
+|---|---|
+| Impact on financial literacy (including the pedagogical angle) | 20% |
+| Originality of AI integration | 20% |
+| Clarity of the mobile user experience | 20% |
+| Feasibility | 20% |
+| Potential to integrate into S-mobiili | 20% |
+
+## Prizes
+
+| Place | Prize |
+|---|---|
+| 1st | €2,000 Airbnb gift card |
+| 2nd | €1,000 Airbnb gift card |
+| 3rd | €500 Airbnb gift card |

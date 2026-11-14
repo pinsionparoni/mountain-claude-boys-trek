@@ -25,7 +25,10 @@ Fill in `.env`:
 
 | Setting | Required | Where to get it |
 |---|---|---|
-| `ANTHROPIC_API_KEY` | Yes, for now | [console.anthropic.com](https://console.anthropic.com) (Junction gives $20 of credits per person) |
+| `COACH_MODEL` | No | `gemma` (default in `.env.example`, the product) or `claude` (development / comparison). Code default if unset: `claude` |
+| `VERDA_BASE_URL` | With `gemma` | `https://containers.datacrunch.io/gemma-coach/v1` (see step 5) |
+| `VERDA_API_KEY` | With `gemma` | Verda console → **Credentials** → **Inference API Keys** → **Create** (ask the teammate who owns Verda) |
+| `ANTHROPIC_API_KEY` | With `claude` | [console.anthropic.com](https://console.anthropic.com) (Junction gives $20 of credits per person) |
 | `DATABASE_URL` | Yes | Service URI of the shared Aiven database from the Aiven console, or a local PostgreSQL (see step 4) |
 | `COACH_WEB_SEARCH` | No | `1` turns on optional Exa web search; default `0` |
 | `EXA_API_KEY` | Only with web search | [dashboard.exa.ai](https://dashboard.exa.ai) |
@@ -95,38 +98,147 @@ Useful for working offline or experimenting without touching the shared data. In
 
 Negative `tx_amount_eur` is money out. "Salary Sweep" and "Invest Withdraw" look like transfers between accounts rather than spending (to confirm with the S-Bank mentors).
 
-## 5. Run the coach
+## 5. Gemma on Verda
+
+The coach's model, Google's Gemma 4 31B, runs in our own vLLM container on Verda:
+
+| | |
+|---|---|
+| Deployment | `gemma-coach`, Verda Serverless Containers, On-Demand, Continuous |
+| URL | `https://containers.datacrunch.io/gemma-coach/v1` (OpenAI-compatible `/v1/chat/completions`) |
+| Model name in requests | `gemma-coach` |
+| Hardware | 1× H100 SXM5 80 GB |
+| Cost | **€5.15 per hour while a replica is running**, starting from the moment it boots |
+| Image | `docker.io/vllm/vllm-openai:v0.29.0` |
+
+**Cost rule:** set **Min replicas to 0** in the deployment's scaling settings when nobody is using it (nights, long breaks), and back to **1** at least 20–30 minutes before anyone needs it (demo, judging). A cold start takes several minutes; the first request after scaling to zero waits for it. Tell the team in chat when you change it.
+
+Quick check that it's up (replace the key):
 
 ```bash
-.venv/bin/python -m coach
+curl -X POST https://containers.datacrunch.io/gemma-coach/v1/chat/completions \
+  --header 'Authorization: Bearer <VERDA_API_KEY>' \
+  --header 'Content-Type: application/json' \
+  --data '{"model": "gemma-coach", "messages": [{"role": "user", "content": "Selitä lyhyesti, mikä on hätävara."}]}'
 ```
 
-A terminal chat for testing. Ctrl+D quits.
+<details>
+<summary>Redeploying from scratch</summary>
+
+Prerequisite: a Hugging Face **Read** token (huggingface.co → profile picture → Access Tokens → Create new token → type **Read**, not fine-grained). If the model page asks you to accept a license, accept it first.
+
+Verda console → Containers → New deployment:
+
+| Field | Value |
+|---|---|
+| Deployment name | `gemma-coach` (becomes the URL; can't be changed later) |
+| Deployment type / compute type | Continuous / On-Demand |
+| Compute | 1x H100 SXM5 (`1H100.80S.21V`) |
+| Image / tag | `docker.io/vllm/vllm-openai` / `v0.29.0` (the plain linux/amd64 one), public, image caching ON |
+| Exposed HTTP port | `8000` (vLLM's port, **not** the default 80) |
+| Healthcheck | ON, port `8000`, path `/health` |
+| Entrypoint | empty |
+| Environment variables | `HF_HOME` = `/data/.huggingface`, `HF_TOKEN` = your Hugging Face token |
+| Scaling | Min 1 / Max 1, concurrent requests per replica 8, queue load Balanced |
+| Storage | container disk `/data` (100 GiB is enough), SHM `/dev/shm` 8 GiB |
+
+**CMD:** each row of the argument list is passed to vLLM as **one** argument, so a flag and its value must be on **separate rows** (or paste this into the command-line view `>_` and check the list view shows 13 rows):
+
+```
+--model google/gemma-4-31B-it --quantization fp8 --served-model-name gemma-coach --max-model-len 32768 --enable-auto-tool-choice --tool-call-parser gemma4 --reasoning-parser gemma4
+```
+
+Don't add `--gpu-memory-utilization 0.9`: it's vLLM's default anyway, and the form mangled the `0.9` value. `--quantization fp8` makes vLLM compress Google's weights to FP8 at load time so the 31B model fits on one H100.
+
+First start takes 15–30 minutes (image pull, ~62 GB model download, FP8 compression). Ready when the logs show the server on port 8000 and the status is healthy.
+
+| Log message | Fix |
+|---|---|
+| `unrecognized arguments` | A flag and its value share one CMD row; split them |
+| `401` / `403` downloading | Wrong `HF_TOKEN`, or license not accepted on Hugging Face |
+| `CUDA out of memory` | Lower `--max-model-len` to `16384` |
+| Healthcheck failing | Exposed and healthcheck ports must both be `8000` |
+
+</details>
+
+## 6. Modal
+
+Used for the what-if calculation Sandboxes (in progress). Connect your machine once:
+
+```bash
+.venv/bin/modal setup        # opens the browser to log in
+.venv/bin/modal profile current
+```
+
+The token is stored in your home directory, not in the project. Ask to be invited to the team's Modal workspace so you use the shared credits.
+
+## 7. Run the coach
+
+```bash
+.venv/bin/python -m coach                 # customer CUST00001
+.venv/bin/python -m coach CUST02500       # any customer from CUST00001 to CUST05100
+COACH_MODEL=claude .venv/bin/python -m coach   # override the model for one run
+```
+
+A terminal chat for testing. Ctrl+D quits. Questions to try: "How much did I spend on taxis last month?", "Mihin rahani menevät? Jaa kulutukseni kolmeen koriin viime kuukaudelta.", "How much could I save per year if I cut restaurant spending by 20%?"
+
+The data ends on 30 September 2026, so the coach treats each customer's last transaction date as "today".
 
 ## Project layout
 
 | Path | Purpose |
 |---|---|
-| `coach/agent.py` | The coach: system prompt (three spending baskets) and the chat loop with tool calls |
+| `coach/agent.py` | The coach: system prompt (three spending baskets, customer context) and the chat loops for Gemma and Claude |
+| `coach/db.py` | Read-only database tools bound to one customer, plus the category → basket mapping |
+| `coach/tools.py` | Provider-neutral tool definition, converted for Claude or OpenAI-compatible models |
 | `coach/web_search.py` | Optional Exa tools, only loaded when `COACH_WEB_SEARCH=1` |
-| `coach/__main__.py` | Terminal chat: `python -m coach` |
+| `coach/__main__.py` | Terminal chat: `python -m coach [CUSTOMER_ID]` |
 | `scripts/load_data.py` | Loads `data/*.csv` into PostgreSQL (`DATABASE_URL`) |
 | `requirements.txt` | Python dependencies |
 | `.env.example` | Template for `.env` |
 
+### Coach tools
+
+Each tool only sees the customer the app chose; the model can't pick a different customer. Connections run in read-only mode.
+
+| Tool | Answers questions like |
+|---|---|
+| `spending_summary` | "Where did my money go last month?" Spending in a date range split into the three baskets with per-category totals, plus income, savings and transfers. With a category, a breakdown by merchant type (taxi, fuel, parking, public transport, …). |
+| `monthly_overview` | "How have my finances changed?", "What's safe to spend?" Month-by-month income, spending per basket, savings and end-of-month balance. |
+| `list_transactions` | "What were my biggest purchases?" The largest or latest transactions in a date range, optionally for one category. |
+
+**Basket mapping** (draft, in `BASKETS` at the top of `coach/db.py`; change it there):
+
+| Basket | Categories |
+|---|---|
+| Mandatory and regular | Housing, Utilities, Groceries, Transportation |
+| Mandatory and irregular | Health, Home & Tech |
+| Everyday | Restaurants, Entertainment, Lifestyle, Travel |
+| Not spending | Salary, Other Income, Invest Withdraw (income); Invest Deposit (savings); Salary Sweep (transfer) |
+
 ### How a chat turn works
 
-`chat(messages)` sends the conversation to the model. If the model asks for a tool, the loop runs it, sends the result back, and repeats until there's a final answer (at most 10 rounds). Today the model is Claude and the only tools are the optional Exa ones; database tools and Gemma on Verda are next (see the build order in [TECH_STACK.md](TECH_STACK.md)).
+`chat(messages, customer_id)` builds the system prompt from the customer's profile, sends the conversation to the model with the tools, runs any tool calls, sends the results back, and repeats until there's a final answer (at most 10 rounds).
 
 ```mermaid
-flowchart TD
-    S["App starts"] --> Q{"COACH_WEB_SEARCH=1<br/>and EXA_API_KEY set?"}
-    Q -->|"Yes"| Y["Model gets web_search + get_contents<br/>and a 'search sparingly' prompt section"]
-    Q -->|"No (default)"| N["No web tools<br/>exa-py is never imported"]
+sequenceDiagram
+    participant U as You
+    participant A as agent.chat()
+    participant G as Gemma (or Claude)
+    participant D as Aiven PostgreSQL
+
+    U->>A: "How much did I spend on taxis last month?"
+    A->>G: system prompt + conversation + tools
+    G-->>A: tool call: spending_summary(Transportation, 2026-09-01..30)
+    A->>D: read-only query for this customer
+    D-->>A: totals by merchant type
+    A->>G: tool result
+    G-->>A: "No taxis last month; transport was 267 €: ..."
+    A-->>U: reply
 ```
 
 ## Next steps
 
-- Database tools for the coach (spending by category and period, basket summary, balance trend), scoped to one customer.
-- Make the model a setting so we can compare Claude and Gemma 4.
-- FastAPI web API for the mobile front end.
+- FastAPI web API around `chat()` for the mobile front end.
+- What-if and safe-to-spend calculations in Modal Sandboxes.
+- Decide where the backend runs for the demo (Modal, Aiven or Verda).

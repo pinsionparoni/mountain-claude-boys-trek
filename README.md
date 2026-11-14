@@ -18,7 +18,7 @@ Full brief: [CHALLENGE.md](CHALLENGE.md)
   2. mandatory and irregular (a broken washing machine),
   3. everyday spending that slips through your fingers (coffees, takeaway).
 - **Computes, doesn't guess:** what-if and safe-to-spend numbers come from real calculations on your data. *(planned)*
-- **Keeps customer data in Europe** by running open models on EU infrastructure. *(planned)*
+- **Keeps customer data in Europe** by running Google's open Gemma 4 model on our own server at Verda, instead of sending it to an outside AI service.
 - **Optional benchmarks** from open sources such as Statistics Finland, without ever sending personal data to a search engine.
 
 ## How it works
@@ -58,7 +58,7 @@ sequenceDiagram
 
 | Technology | Role |
 |---|---|
-| **Gemma 4** on **Verda** | The coach's AI model, self-hosted in EU data centres *(in progress)* |
+| **Gemma 4 31B** on **Verda** | The coach's AI model, self-hosted with vLLM on an H100 |
 | **Aiven PostgreSQL** | The S-Pankki synthetic dataset: 5,100 customers, 3.6M transactions |
 | **Modal** | Secure sandboxes for what-if and safe-to-spend calculations *(planned)* |
 | **Claude** | Development and quality baseline |

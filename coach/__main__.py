@@ -1,11 +1,14 @@
-"""Terminal REPL for trying the coach: python -m coach"""
+"""Terminal REPL for trying the coach: python -m coach [CUSTOMER_ID]"""
 
-from coach.agent import chat
+import sys
+
+from coach.agent import COACH_MODEL, chat
 
 
 def main():
+    customer_id = sys.argv[1] if len(sys.argv) > 1 else "CUST00001"
     messages = []
-    print("Finance coach. Ctrl+D to quit.")
+    print(f"Finance coach ({COACH_MODEL}) for {customer_id}. Ctrl+D to quit.")
     while True:
         try:
             user_input = input("\nyou> ").strip()
@@ -14,7 +17,7 @@ def main():
         if not user_input:
             continue
         messages.append({"role": "user", "content": user_input})
-        print(f"\ncoach> {chat(messages)}")
+        print(f"\ncoach> {chat(messages, customer_id)}")
 
 
 if __name__ == "__main__":

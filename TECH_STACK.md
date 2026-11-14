@@ -2,7 +2,7 @@
 
 Plan for our S-Pankki **Personal Economic Trainer** ([CHALLENGE.md](CHALLENGE.md)), combined with several Junction 2026 tech challenges.
 
-> **Status:** draft plan. Items marked ⚠️ are not verified yet.
+> **Status:** in progress. Items marked ⚠️ are not verified yet. Setup details for developers are in [SETUP.md](SETUP.md).
 > ⚠️ We heard teams can enter as many tech challenges as they like. Confirm with the organisers.
 
 ## Pitch in one line
@@ -58,7 +58,7 @@ sequenceDiagram
 
     U->>A: "How much could I save if I cut dining out by 20%?"
     A->>G: conversation + tools
-    G-->>A: tool call: spending_by_category(Restaurants, last 6 months)
+    G-->>A: tool call: spending_summary(Restaurants, last 12 months)
     A->>D: SQL query for this customer only
     D-->>A: monthly totals
     A->>G: tool result
@@ -90,20 +90,21 @@ Source: [hackjunction/Junction-2026-S-pankki](https://github.com/hackjunction/Ju
 - Loaded with `scripts/load_data.py`: tables `customers`, `transactions`, `mortgage_outcomes`, `mortgage_events`, indexed by customer and date. The database takes **628 MB** including indexes, on an Aiven Developer-1 plan (8 GB storage) in Frankfurt. A per-customer query takes under a millisecond in the database, about 50–100 ms from a laptop including network.
 - The CSVs start with a UTF-8 BOM: read with `utf-8-sig`.
 - The transactions file is in Git LFS: clone with `git lfs install` first, or GitHub's "Download ZIP" may give only a pointer file.
-- **Three baskets** come mostly from rules on `category` and `transaction_type` (e.g. Housing, Utilities → mandatory regular; Restaurants, Entertainment → everyday), with the model handling edge cases like Health or Home & Tech.
+- **Three baskets** come from a category mapping in `coach/db.py` (draft: Housing, Utilities, Groceries, Transportation → mandatory regular; Health, Home & Tech → mandatory irregular; Restaurants, Entertainment, Lifestyle, Travel → everyday; income, savings and transfers are not spending). Merchant codes split categories further, e.g. Transportation → taxi, fuel, parking, public transport.
 
 ### Coach model: Gemma 4 on Verda
 
 - Verda's ready-made Inference API offers only Kimi K3.1 Pro and DeepSeek V4.1 Flash. **No Gemma**, so we self-host Gemma with vLLM on Verda Serverless Containers (OpenAI-style `/v1/chat/completions` endpoint, per-minute billing, scale to zero).
-- Gemma 4 sizes: E2B, E4B, 12B, **26B A4B** (MoE, ~4B active, fast), **31B** (dense, strongest). 256K context on the larger models, native tool use and JSON output, image input.
-- Start with **26B A4B**; try **31B** if answer quality is lacking.
-- ⚠️ GPU types, prices and data-centre countries for Verda containers are not in their docs. Ask at the Verda booth.
-- ⚠️ Gemma 4's tool-calling quality is untested for our use case.
+- Gemma 4 sizes: E2B, E4B, 12B, 26B A4B (MoE, ~4B active, fast), **31B** (dense, strongest). Gemma 4 is the latest generation; there is no Gemma 5.
+- **We run Google's official `google/gemma-4-31B-it`**, compressed to FP8 by vLLM at load time so it fits on **1× H100 80 GB** (€5.15/h). Chosen over 26B A4B for tool use: Google's Tau2 agentic benchmark gives 31B 76.9% vs 68.2% for 26B A4B.
+- **Tested (Nov 14):** correct tool calls and numbers in English and Finnish (checked against SQL), natural Finnish, about 64 tokens/s, 2–5 s per answer including database lookups. No fine-tuning needed for Finnish.
+- Container settings, cost rule (scale to 0 when idle) and redeploy steps: [SETUP.md § 5](SETUP.md#5-gemma-on-verda).
+- ⚠️ Data-centre country for Verda containers is not shown in the console. Ask at the Verda booth.
 
 ### Fallback and comparison model: Claude API
 
-- Current code (`coach/agent.py`) runs on Claude Opus 5.5.
-- Kept as a switchable model for development and as a quality baseline to test Gemma against.
+- `COACH_MODEL=claude` switches the coach to Claude Opus 5.5 with the same tools.
+- Kept for development and as a quality baseline to test Gemma against.
 - Budget: $20 of Claude credits per person.
 
 ### Calculations: Modal Sandboxes
@@ -125,9 +126,10 @@ Source: [hackjunction/Junction-2026-S-pankki](https://github.com/hackjunction/Ju
 ## Build order
 
 1. **Data:** ✅ done. Aiven PostgreSQL 18 (Frankfurt, Developer-1 plan) loaded with all 3.6M transactions via `scripts/load_data.py`.
-2. **Tools:** give the coach 2–3 database tools (spending by category and period, basket summary, balance trend), scoped to one customer.
-3. **Model switch:** make the model a setting; run the same 10–20 questions from the brief through Claude and Gemma 4 to compare.
-4. **Gemma on Verda:** deploy the vLLM container, point the coach at it.
+2. **Tools:** ✅ done. `spending_summary`, `monthly_overview`, `list_transactions` in `coach/db.py`, read-only and bound to one customer.
+3. **Model switch:** ✅ done. `COACH_MODEL=gemma|claude`. Next: a fixed set of 10–20 questions from the brief to compare models and catch regressions.
+4. **Gemma on Verda:** ✅ done. `gemma-coach` container running Gemma 4 31B (FP8), tested in English and Finnish.
+4b. **Web API:** FastAPI around `chat()` so the front end can be built in parallel.
 5. **Modal Sandboxes:** what-if and safe-to-spend calculations.
 6. **Front end:** mobile-friendly web chat calling the backend.
 7. **Add-ons:** Nemotron receipts, CRACI CI, ElevenLabs voice if time allows.
@@ -137,8 +139,9 @@ The S-Pankki challenge is the main prize: a polished coach beats many half-worki
 ## Open questions
 
 - [ ] Can teams enter multiple tech challenges? (Organisers)
-- [ ] Verda container GPU types, prices and data-centre countries. (Verda booth)
-- [ ] Is Gemma 4 26B / 31B reliable enough at tool calls? (Test in step 3)
+- [ ] Verda data-centre country. (Verda booth) GPU types and prices are known: 1× H100 at €5.15/h.
+- [x] Is Gemma 4 reliable enough at tool calls? Yes: 31B FP8 passed the first English and Finnish tests.
+- [ ] Where does the demo backend run? (Modal, Aiven or Verda)
 - [ ] Gemma challenge submission requirements. (Google DeepMind booth / Discord)
 - [ ] Are "Salary Sweep" and "Invest Withdraw" transfers between accounts rather than spending? (S-Bank data scientist mentor)
 - [ ] Who on the team owns which component?

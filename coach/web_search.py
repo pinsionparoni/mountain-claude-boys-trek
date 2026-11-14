@@ -5,6 +5,8 @@ Off by default. Enable with COACH_WEB_SEARCH=1 and an EXA_API_KEY.
 
 import os
 
+from coach.tools import Tool
+
 PROMPT = """
 
 Web search (optional helper, use sparingly):
@@ -21,10 +23,12 @@ def enabled():
 
 
 def load_tools():
-    """Return Exa tools for Claude, or [] when web search is disabled."""
+    """Return Exa tools, or [] when web search is disabled."""
     if not enabled():
         return []
     from exa_py import Exa  # imported lazily so exa-py stays an optional dependency
 
     exa = Exa()  # reads EXA_API_KEY from the environment
-    return [exa.anthropic.web_search(), exa.anthropic.get_contents()]
+    # Provider-neutral specs, so the same tools work with Claude and Gemma.
+    specs = [exa.tools.web_search(), exa.tools.get_contents()]
+    return [Tool(s.name, s.description, s.json_schema, s.run) for s in specs]
