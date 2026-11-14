@@ -1,14 +1,25 @@
-"""Terminal REPL for trying the coach: python -m coach [CUSTOMER_ID]"""
+"""Terminal REPL for trying the coach: python -m coach --customer CUST00001"""
 
-import sys
+import argparse
+import os
 
 from coach.agent import COACH_MODEL, chat
 
 
 def main():
-    customer_id = sys.argv[1] if len(sys.argv) > 1 else "CUST00001"
+    parser = argparse.ArgumentParser(description="Chat with the finance coach in the terminal.")
+    parser.add_argument(
+        "--customer",
+        default=os.getenv("COACH_CUSTOMER_ID"),
+        help="ID of the customer whose data the coach may read (or set COACH_CUSTOMER_ID)",
+    )
+    customer_id = parser.parse_args().customer
+
     messages = []
-    print(f"Finance coach ({COACH_MODEL}) for {customer_id}. Ctrl+D to quit.")
+    if customer_id:
+        print(f"Finance coach ({COACH_MODEL}) for {customer_id}. Ctrl+D to quit.")
+    else:
+        print(f"Finance coach ({COACH_MODEL}, no customer set, so it cannot read any transactions). Ctrl+D to quit.")
     while True:
         try:
             user_input = input("\nyou> ").strip()
@@ -17,7 +28,7 @@ def main():
         if not user_input:
             continue
         messages.append({"role": "user", "content": user_input})
-        print(f"\ncoach> {chat(messages, customer_id)}")
+        print(f"\ncoach> {chat(messages, customer_id=customer_id)}")
 
 
 if __name__ == "__main__":

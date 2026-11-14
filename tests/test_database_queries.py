@@ -1,0 +1,204 @@
+"""
+Tests for coach/database/queries.py that need no real database.
+
+A fake connection records the SQL and parameters and returns canned rows, so
+these tests check what is asked of the database (and how results are shaped),
+not what PostgreSQL returns. Confirm the SQL itself with the live check in
+tests/test_queries.py.
+
+    python -m pytest tests/test_database_queries.py
+"""
+
+import types
+from datetime import date
+
+import pytest
+
+# tests/conftest.py stubs psycopg and dotenv if they are not installed.
+from coach.database import queries
+from coach.spending_baskets import (
+    CONSUMPTION_TRANSACTION_TYPES,
+    EXCLUDED_FROM_CONSUMPTION,
+)
+
+START = date(2026, 1, 1)
+END = date(2026, 3, 31)
+
+
+class FakeCursor:
+    def __init__(self, rows):
+        self.rows = rows
+        self.calls = []
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        return False
+
+    def execute(self, query, params=None):
+        self.calls.append((query, params))
+
+    def fetchall(self):
+        return self.rows
+
+
+class FakeConnection:
+    def __init__(self, cursor):
+        self._cursor = cursor
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        return False
+
+    def cursor(self):
+        return self._cursor
+
+
+@pytest.fixture
+def fake_db(monkeypatch):
+    """Queue canned row sets; each get_connection() call uses the next one."""
+    cursors = []
+    queued = []
+
+    def queue(*row_sets):
+        queued.extend(row_sets)
+
+    def get_connection():
+        cursor = FakeCursor(queued.pop(0))
+        cursors.append(cursor)
+        return FakeConnection(cursor)
+
+    monkeypatch.setattr(queries, "get_connection", get_connection)
+    return types.SimpleNamespace(queue=queue, cursors=cursors)
+
+
+# --------------------------------------------------------------------------
+# spending_by_category
+# --------------------------------------------------------------------------
+
+def test_spending_only_counts_known_consumption_types(fake_db):
+    fake_db.queue([])
+    queries.spending_by_category("CUST1", START, END)
+
+    sql, params = fake_db.cursors[0].calls[0]
+    assert "transaction_type = ANY(%s)" in sql
+    assert params == ("CUST1", START, END, list(CONSUMPTION_TRANSACTION_TYPES))
+    # Regression: salary sweeps were once counted as spending.
+    assert "salary_sweep" not in params[3]
+    assert "investment_deposit" not in params[3]
+
+
+def test_spending_returns_rows_unchanged(fake_db):
+    rows = [{"category": "Groceries", "total_spending_eur": 10, "transaction_count": 2}]
+    fake_db.queue(rows)
+    assert queries.spending_by_category("CUST1", START, END) == rows
+
+
+@pytest.mark.parametrize(
+    "customer_id, start, end",
+    [("", START, END), (None, START, END), ("CUST1", END, START)],
+)
+def test_spending_validates_input(fake_db, customer_id, start, end):
+    with pytest.raises(ValueError):
+        queries.spending_by_category(customer_id, start, end)
+    assert fake_db.cursors == []  # rejected before touching the database
+
+
+# --------------------------------------------------------------------------
+# financial_flows
+# --------------------------------------------------------------------------
+
+def test_financial_flows_asks_only_for_non_consumption_types(fake_db):
+    fake_db.queue([])
+    queries.financial_flows("CUST1", START, END)
+
+    sql, params = fake_db.cursors[0].calls[0]
+    assert "transaction_type = ANY(%s)" in sql
+    assert params == ("CUST1", START, END, list(EXCLUDED_FROM_CONSUMPTION))
+    assert not set(params[3]) & set(CONSUMPTION_TRANSACTION_TYPES)
+
+
+def test_financial_flows_validates_input(fake_db):
+    with pytest.raises(ValueError):
+        queries.financial_flows("", START, END)
+    with pytest.raises(ValueError):
+        queries.financial_flows("CUST1", END, START)
+
+
+# --------------------------------------------------------------------------
+# basket_summary
+# --------------------------------------------------------------------------
+
+def test_basket_summary_separates_spending_from_flows(fake_db):
+    fake_db.queue(
+        [
+            {"category": "Housing", "total_spending_eur": 900, "transaction_count": 3},
+            {"category": "Groceries", "total_spending_eur": 100, "transaction_count": 9},
+        ],
+        [
+            {"transaction_type": "salary", "net_amount_eur": 3000, "transaction_count": 3},
+            {"transaction_type": "salary_sweep", "net_amount_eur": -250.456, "transaction_count": 3},
+        ],
+    )
+
+    result = queries.basket_summary("CUST1", START, END)
+
+    # Spending baskets hold consumption only; flows never leak in.
+    assert result["total_spending_eur"] == 1000.0
+    assert result["baskets"]["mandatory_regular"]["total_eur"] == 900.0
+    assert result["baskets"]["everyday_flexible"]["total_eur"] == 100.0
+
+    flows = {f["transaction_type"]: f for f in result["financial_flows"]}
+    assert flows["salary"]["net_amount_eur"] == 3000.0
+    assert flows["salary"]["note"] is None
+    assert flows["salary_sweep"]["net_amount_eur"] == -250.46
+    assert "purpose unknown" in flows["salary_sweep"]["note"]
+
+    # 250.456 swept out of 3000 salary = 8.3%.
+    assert result["has_salary_sweep"] is True
+    assert result["swept_share_of_salary_pct"] == 8.3
+    assert "8.3% of salary" in result["salary_sweep_note"]
+
+    assert result["period"] == {"start_date": "2026-01-01", "end_date": "2026-03-31"}
+
+
+def test_basket_summary_passes_customer_confirmation_through(fake_db):
+    fake_db.queue(
+        [{"category": "Health", "total_spending_eur": 300, "transaction_count": 3}],
+        [],
+    )
+    result = queries.basket_summary(
+        "CUST1", START, END, essentiality_by_category={"Health": "essential"}
+    )
+    assert result["baskets"]["mandatory_irregular"]["total_eur"] == 300.0
+    assert result["financial_flows"] == []
+    assert result["has_salary_sweep"] is False
+    assert result["salary_sweep_note"] is None
+
+
+# --------------------------------------------------------------------------
+# monthly_balance_trend
+# --------------------------------------------------------------------------
+
+def test_balance_trend_is_anchored_to_the_customers_data_not_today(fake_db):
+    fake_db.queue([])
+    queries.monthly_balance_trend("CUST1", months=6)
+
+    sql, params = fake_db.cursors[0].calls[0]
+    assert "MAX(tx_date)" in sql
+    assert "CURRENT_DATE" not in sql
+    assert params == ("CUST1", "CUST1", 6)
+
+
+@pytest.mark.parametrize("months", [0, 25, -1])
+def test_balance_trend_validates_months(fake_db, months):
+    with pytest.raises(ValueError):
+        queries.monthly_balance_trend("CUST1", months=months)
+
+
+def test_balance_trend_requires_customer(fake_db):
+    with pytest.raises(ValueError):
+        queries.monthly_balance_trend("", months=6)

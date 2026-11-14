@@ -2,6 +2,11 @@
 
 COACH_MODEL picks the model: "claude" (default, Anthropic API) or "gemma"
 (Gemma 4 on Verda via its OpenAI-compatible endpoint, VERDA_BASE_URL + VERDA_API_KEY).
+
+Every tool is an Anthropic tool definition (a dict with name, description and
+input_schema) that also has ``name`` and ``run(input) -> str``: the coach's
+spending tools (coach/tools/spending.py) and Exa's helpers both work this way.
+For Gemma the definitions are converted to the OpenAI function format.
 """
 
 import json
@@ -9,8 +14,9 @@ import os
 
 from dotenv import load_dotenv
 
-from coach import db, web_search
-from coach.tools import to_anthropic, to_openai
+from coach import web_search
+from coach.database import queries
+from coach.tools import spending
 
 load_dotenv()
 
@@ -22,20 +28,17 @@ MAX_TURNS = 10
 SYSTEM_PROMPT = """You are a friendly personal finance coach inside a Finnish bank's mobile app. \
 You help everyday customers understand where their money goes and make better decisions.
 
-You are talking with customer {customer_id} (age {age}). Their transaction data runs from {data_from} \
-to {data_to}. Treat {data_to} as today: "this month", "last month" and "this week" are relative to that date. \
-Their current account balance is {balance_eur} €.
+Teach with three spending baskets: regular essentials, unexpected necessities, and everyday spending \
+that slips through your fingers.
 
-Teach with three spending baskets:
-1. Mandatory and regular (housing, utilities, groceries, transport)
-2. Mandatory and irregular (health, home & tech: a broken washing machine, a dentist bill)
-3. Everyday spending that slips through your fingers (restaurants, entertainment, lifestyle, travel)
-
-Use your tools for every number about the customer's money. Never estimate or invent amounts; if the tools \
-can't answer, say so. Show the key numbers you used, rounded to whole euros. Explain financial ideas in plain \
-language, and end with one concrete, encouraging suggestion when it fits.
+Explain financial ideas in plain language, and end with one concrete, encouraging suggestion when it fits.
 
 Keep answers short and mobile-friendly. Answer in the language the user writes in."""
+
+CUSTOMER_PROMPT = """
+
+You are talking with customer {customer_id} (age {age}). Their transaction data runs from {data_from} \
+to {data_to}; treat {data_to} as today. Their current account balance is {balance_eur} €."""
 
 _clients = {}
 
@@ -52,7 +55,13 @@ def _client():
     return _clients[COACH_MODEL]
 
 
+def _to_openai(tool):
+    return {"type": "function", "function": {
+        "name": tool["name"], "description": tool["description"], "parameters": tool["input_schema"]}}
+
+
 def _run_tool(tools, name, args):
+    """Run a tool and return (output, is_error)."""
     tool = tools.get(name)
     if tool is None:
         return f'Error: unknown tool "{name}"', True
@@ -64,7 +73,7 @@ def _run_tool(tools, name, args):
 
 def _chat_claude(messages, system, tools):
     by_name = {t.name: t for t in tools}
-    params = {"tools": [to_anthropic(t) for t in tools]} if tools else {}
+    params = {"tools": [dict(t) for t in tools]} if tools else {}
     for _ in range(MAX_TURNS):
         response = _client().beta.messages.create(
             model=CLAUDE_MODEL,
@@ -104,7 +113,7 @@ def _chat_claude(messages, system, tools):
 
 def _chat_gemma(messages, system, tools):
     by_name = {t.name: t for t in tools}
-    params = {"tools": [to_openai(t) for t in tools]} if tools else {}
+    params = {"tools": [_to_openai(t) for t in tools]} if tools else {}
     for _ in range(MAX_TURNS):
         response = _client().chat.completions.create(
             model=GEMMA_MODEL,
@@ -139,15 +148,22 @@ def _chat_gemma(messages, system, tools):
     return "Sorry, that took too many steps. Could you narrow the question down?"
 
 
-def chat(messages, customer_id):
-    """Run one user turn for one customer.
+def chat(messages, customer_id=None):
+    """Run one user turn.
 
     `messages` is the conversation so far in the chosen model's format, ending with a
     {"role": "user", "content": "..."} message. Appends the assistant's turn(s) in place
     and returns the final reply text.
+
+    With a `customer_id` the coach can read that one customer's transactions through the
+    spending tools. Without one it has no access to any customer data.
     """
-    system = SYSTEM_PROMPT.format(**db.customer_profile(customer_id))
-    tools = db.load_tools(customer_id) + web_search.load_tools()
+    system = SYSTEM_PROMPT
+    tools = web_search.load_tools()
+    if customer_id:
+        system += CUSTOMER_PROMPT.format(**queries.customer_profile(customer_id))
+        system += spending.PROMPT
+        tools += spending.load_tools(customer_id)
     if web_search.enabled():
         system += web_search.PROMPT
     if COACH_MODEL == "gemma":

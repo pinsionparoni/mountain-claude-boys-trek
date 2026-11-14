@@ -5,8 +5,6 @@ Off by default. Enable with COACH_WEB_SEARCH=1 and an EXA_API_KEY.
 
 import os
 
-from coach.tools import Tool
-
 PROMPT = """
 
 Web search (optional helper, use sparingly):
@@ -29,6 +27,5 @@ def load_tools():
     from exa_py import Exa  # imported lazily so exa-py stays an optional dependency
 
     exa = Exa()  # reads EXA_API_KEY from the environment
-    # Provider-neutral specs, so the same tools work with Claude and Gemma.
-    specs = [exa.tools.web_search(), exa.tools.get_contents()]
-    return [Tool(s.name, s.description, s.json_schema, s.run) for s in specs]
+    # Anthropic-format definitions with run(); agent.py converts them for Gemma.
+    return [exa.anthropic.web_search(), exa.anthropic.get_contents()]
