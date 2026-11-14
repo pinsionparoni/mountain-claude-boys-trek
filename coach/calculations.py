@@ -528,20 +528,22 @@ def compare_with_peers(
             "everyone": _compare(mine, all_values),
         }
 
-    def standouts(level: str) -> list:
+    def standouts(level: str, rank_field: str) -> list:
+        # Each list carries only the rank that reads naturally for it, so the
+        # model cannot put "spends more than 15%" into a "less than" sentence
+        # (Gemma did, once both were offered).
         found = [
             {
                 "category": c,
                 "my_monthly": rows[c]["my_monthly"],
                 "peer_median_monthly": rows[c]["age_group"]["peer_median_monthly"],
-                "spends_more_than_pct_of_peers": rows[c]["age_group"]["spends_more_than_pct_of_peers"],
-                "spends_less_than_pct_of_peers": rows[c]["age_group"]["spends_less_than_pct_of_peers"],
+                rank_field: rows[c]["age_group"][rank_field],
             }
             for c in categories
             if c not in excluded and rows[c]["age_group"]["level"] == level
         ]
         # Furthest from the middle first.
-        return sorted(found, key=lambda r: -abs(r["spends_more_than_pct_of_peers"] - 50))
+        return sorted(found, key=lambda r: -r[rank_field])
 
     return {
         "age_group": group,
@@ -552,7 +554,7 @@ def compare_with_peers(
         "by_category": {c: rows[c] for c in categories},
         "profile": {
             "overall_level": rows[TOTAL]["age_group"]["level"],
-            "above_peers": standouts("above_peers"),
-            "below_peers": standouts("below_peers"),
+            "above_peers": standouts("above_peers", "spends_more_than_pct_of_peers"),
+            "below_peers": standouts("below_peers", "spends_less_than_pct_of_peers"),
         },
     }

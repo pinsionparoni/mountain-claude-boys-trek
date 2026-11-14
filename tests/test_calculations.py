@@ -584,3 +584,22 @@ def test_excluded_categories_stay_in_the_comparison_but_not_the_profile():
     # Rent still counts in the total: 330 vs 1100 a month.
     assert result["total"]["my_monthly"] == 330.0
     assert result["total"]["age_group"]["peer_median_monthly"] == 1100.0
+
+
+def test_profile_entries_carry_only_the_rank_that_fits_them():
+    # Customer: high on A (top), low on B (bottom). An "above" entry offers
+    # only "spends more than", a "below" entry only "spends less than", so
+    # the model can't report 15 % where 85 % is meant.
+    peers = [{"age": 40, "spending": {"A": 30 * i, "B": 30 * i}} for i in range(40)]
+    profile = compare_with_peers(
+        customer_spending={"A": 1170, "B": 0}, customer_age=40, peers=peers, months=3,
+    )["profile"]
+    assert profile["above_peers"] == [{
+        "category": "A", "my_monthly": 390.0, "peer_median_monthly": 195.0,
+        "spends_more_than_pct_of_peers": 98.8,  # (39 + 0.5) / 40
+    }]
+    assert profile["below_peers"] == [{
+        "category": "B", "my_monthly": 0.0, "peer_median_monthly": 195.0,
+        # "More than" is (0 + 0.5) / 40 = 1.25 -> 1.3 %; the two always add to 100.
+        "spends_less_than_pct_of_peers": 98.7,
+    }]
