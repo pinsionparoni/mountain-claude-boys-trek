@@ -9,6 +9,8 @@ scripts/audits/check_queries.py.
     python -m pytest tests/test_database_queries.py
 """
 
+import contextlib
+import json
 import types
 from datetime import date
 from decimal import Decimal
@@ -20,6 +22,8 @@ from coach.database import queries
 from coach.spending_baskets import (
     CONSUMPTION_TRANSACTION_TYPES,
     EXCLUDED_FROM_CONSUMPTION,
+    UNCLASSIFIED,
+    basket_lookup,
 )
 
 START = date(2026, 1, 1)
@@ -59,6 +63,9 @@ class FakeConnection:
 
     def cursor(self):
         return self._cursor
+
+    def transaction(self):
+        return contextlib.nullcontext()
 
 
 @pytest.fixture
@@ -286,3 +293,77 @@ def test_balance_as_of(fake_db):
     assert queries.balance_as_of("CUST1", date(2026, 9, 18)) == 812.35
     assert fake_db.cursors[0].calls[0][1] == ("CUST1", date(2026, 9, 18))
     assert queries.balance_as_of("CUST1", date(2020, 1, 1)) is None
+
+
+# --- Peer population -------------------------------------------------------
+
+
+@pytest.fixture
+def fresh_population_cache():
+    queries.population_spending.cache_clear()
+    yield
+    queries.population_spending.cache_clear()
+
+
+def test_population_counts_only_consumption_in_the_period(fake_db, fresh_population_cache):
+    fake_db.queue([])
+
+    queries.population_spending(START, END)
+
+    calls = fake_db.cursors[0].calls
+    # More memory for this one transaction only, then the query.
+    assert calls[0][0] == f"SET LOCAL work_mem = '{queries.POPULATION_WORK_MEM}'"
+    query, params = calls[1]
+    assert (params["start"], params["end"]) == (START, END)
+    assert params["types"] == CONSUMPTION_TRANSACTION_TYPES
+    assert "tx_amount_eur < 0" in query
+    # Every customer is returned, including ones with no spending at all.
+    assert "FROM customers AS c" in query
+    assert "LEFT JOIN by_category" in query
+
+
+def test_population_sends_the_python_basket_rules(fake_db, fresh_population_cache):
+    fake_db.queue([])
+
+    queries.population_spending(START, END)
+
+    params = fake_db.cursors[0].calls[1][1]
+    assert json.loads(params["lookup"]) == basket_lookup()
+    assert json.loads(params["thresholds"])["Health"] == "538.50"  # 10 x 53.85
+    assert params["unclassified"] == UNCLASSIFIED
+
+
+def test_population_rows_are_shaped_with_float_totals(fake_db, fresh_population_cache):
+    fake_db.queue([
+        {"customer_id": "CUST00001", "age": 63,
+         "spending": {"Groceries": Decimal("812.40"), "Travel": 99},
+         "baskets": {"regular_essentials": Decimal("812.40"), "everyday_spending": 99}},
+        {"customer_id": "CUST00002", "age": 21, "spending": {}, "baskets": {}},
+    ])
+
+    rows = queries.population_spending(START, END)
+
+    assert rows == (
+        {"customer_id": "CUST00001", "age": 63,
+         "spending": {"Groceries": 812.4, "Travel": 99.0},
+         "baskets": {"regular_essentials": 812.4, "everyday_spending": 99.0}},
+        {"customer_id": "CUST00002", "age": 21, "spending": {}, "baskets": {}},
+    )
+    assert isinstance(rows[0]["baskets"]["everyday_spending"], float)
+
+
+def test_population_is_cached_per_period(fake_db, fresh_population_cache):
+    fake_db.queue([], [])
+
+    first = queries.population_spending(START, END)
+    again = queries.population_spending(START, END)
+    queries.population_spending(START, date(2026, 6, 30))
+
+    assert first is again
+    assert len(fake_db.cursors) == 2  # one database call per distinct period
+
+
+def test_population_rejects_reversed_dates(fake_db, fresh_population_cache):
+    with pytest.raises(ValueError):
+        queries.population_spending(END, START)
+    assert fake_db.cursors == []

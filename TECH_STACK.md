@@ -118,6 +118,14 @@ Source: [hackjunction/Junction-2026-S-pankki](https://github.com/hackjunction/Ju
 - Customer photographs a receipt or surprise bill; Nemotron extracts amount, merchant and category, and the coach files it under "mandatory and irregular" where it fits.
 - For development: NVIDIA Build's free hosted API (rate-limited, OpenAI-compatible). For the demo: ideally hosted on Verda to keep the EU story. It's a 120B model, so this needs a large GPU.
 
+### Peer comparison: "What kind of spender am I?"
+
+- The `compare_with_peers` tool compares a customer with people their age and with all 5,100 customers over the last 12 complete months, per category and per basket: monthly amount, peer median and typical range (25th–75th percentile), and the share of peers who spend less or more.
+- **Age groups** are Statistics Finland's household budget survey bands (18–24, 25–34, …, 65–74, 75+), so they line up with official benchmarks if we add them. Smallest group: 75+ with 130 customers.
+- A **profile** lists the habits that stand out (top or bottom quarter of the age group). Rent and utilities stay in the comparison but out of the profile: they reflect living situation, not habits.
+- **Privacy:** the model only sees medians and ranks, never another customer's data.
+- **How:** one query (`population_spending`) totals every customer's spending per category and basket. Baskets are placed in SQL with a lookup table generated from the Python rules, so the rules live only in `coach/spending_baskets.py`. It takes about 10 s on the Developer-1 plan, so the API loads it in the background at startup and caches it. Maths in `coach/calculations.py`, wiring in `coach/peers.py`.
+
 ### Optional: Exa web search
 
 - Already built in `coach/web_search.py`, off by default (`COACH_WEB_SEARCH=1` to enable).
@@ -126,12 +134,12 @@ Source: [hackjunction/Junction-2026-S-pankki](https://github.com/hackjunction/Ju
 ## Build order
 
 1. **Data:** ✅ done. Aiven PostgreSQL 18 (Frankfurt, Developer-1 plan) loaded with all 3.6M transactions via `scripts/load_data.py`.
-2. **Tools:** ✅ done. `spending_summary`, `monthly_overview`, `list_transactions` in `coach/db.py`, read-only and bound to one customer.
+2. **Tools:** ✅ done. Eight customer-scoped tools in `coach/tools/spending.py`, on a read-only query layer (`coach/database/queries.py`) and the basket rules (`coach/spending_baskets.py`), including safe-to-spend and the peer comparison.
 3. **Model switch:** ✅ done. `COACH_MODEL=gemma|claude`. Next: a fixed set of 10–20 questions from the brief to compare models and catch regressions.
 4. **Gemma on Verda:** ✅ done. `gemma-coach` container running Gemma 4 31B (FP8), tested in English and Finnish.
-4b. **Web API:** FastAPI around `chat()` so the front end can be built in parallel.
-5. **Modal Sandboxes:** what-if and safe-to-spend calculations.
-6. **Front end:** mobile-friendly web chat calling the backend.
+4b. **Web API:** ✅ done. FastAPI in `coach/api.py` with a streamed chat (see [SETUP.md § 9](SETUP.md#9-web-api)).
+5. **Calculations:** ✅ done in plain Python (`coach/calculations.py`, `coach/budget.py`, `coach/peers.py`). Next: run them in Modal Sandboxes.
+6. **Front end:** ✅ first version in `frontend/` (React + Vite): live cards, streamed chat, English and Finnish. Polish in progress.
 7. **Add-ons:** Nemotron receipts, CRACI CI, ElevenLabs voice if time allows.
 
 The S-Pankki challenge is the main prize: a polished coach beats many half-working integrations. Stop adding challenges if the core isn't solid.

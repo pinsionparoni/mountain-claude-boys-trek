@@ -28,8 +28,11 @@ demo, not for real customers.
 """
 
 import json
+import logging
 import re
+import threading
 import uuid
+from contextlib import asynccontextmanager
 from datetime import date
 
 from fastapi import FastAPI, HTTPException
@@ -37,11 +40,32 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
-from coach import agent, budget
+from coach import agent, budget, peers
 from coach.database import queries
 from coach.spending_baskets import BASKET_LABELS_FI
+from coach.tools.spending import DATA_END
 
-app = FastAPI(title="Mountain Claude Boys finance coach")
+log = logging.getLogger(__name__)
+
+
+def _warm_peer_cache():
+    # Every customer's data ends in late September 2026, so one period serves them all.
+    try:
+        peers.warm_up(budget.coach_today(DATA_END))
+        log.info("Peer comparison data loaded")
+    except Exception:  # the first compare_with_peers call will load it instead
+        log.exception("Could not preload peer comparison data")
+
+
+@asynccontextmanager
+async def lifespan(app):
+    # The peer population takes several seconds to load; do it in the
+    # background so the API answers immediately.
+    threading.Thread(target=_warm_peer_cache, daemon=True).start()
+    yield
+
+
+app = FastAPI(title="Mountain Claude Boys finance coach", lifespan=lifespan)
 
 # The front end may be served from another address while developing.
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])

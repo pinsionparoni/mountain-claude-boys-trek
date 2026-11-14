@@ -443,3 +443,163 @@ def test_budget_progress_over_budget():
 def test_budget_progress_rejects_bad_days(days, error):
     with pytest.raises(error):
         calculations.budget_progress(everyday_budget=100, everyday_spent=0, days_left_in_month=days)
+
+
+# --------------------------------------------------------------------------
+# Peer comparison
+# --------------------------------------------------------------------------
+
+from coach.calculations import MIN_PEERS, age_group, compare_with_peers  # noqa: E402
+
+
+@pytest.mark.parametrize(
+    "age, expected",
+    [(18, "18–24"), (24, "18–24"), (25, "25–34"), (44, "35–44"),
+     (45, "45–54"), (64, "55–64"), (74, "65–74"), (75, "75+"), (90, "75+")],
+)
+def test_age_group_bands(age, expected):
+    assert age_group(age) == expected
+
+
+@pytest.mark.parametrize("age, error", [(17, ValueError), (21.5, TypeError), (True, TypeError)])
+def test_age_group_rejects_bad_ages(age, error):
+    with pytest.raises(error):
+        age_group(age)
+
+
+def _young_peers():
+    """40 peers aged 21 spending 0, 30, 60, ... 1170 € on Restaurants over
+    3 months (10, 20, ... a month after dividing by 3, starting at 0)."""
+    return [{"age": 21, "spending": {"Restaurants": 30 * i}} for i in range(40)]
+
+
+def test_compare_with_peers_by_hand():
+    # Monthly peer amounts: 0, 10, 20, ... 390. Median of 40 values sits
+    # between the 20th and 21st: (190 + 200) / 2 = 195.
+    # Quartiles (linear): position 39 * 0.25 = 9.75 -> 90 + 0.75 * 10 = 97.5;
+    # 39 * 0.75 = 29.25 -> 290 + 0.25 * 10 = 292.5.
+    # Customer: 900 € / 3 = 300 a month. Peers below 300: 0..290 = 30 of 40,
+    # one tie (300) counts half: (30 + 0.5) / 40 = 76.25 -> 76.3 %.
+    # Difference from median: (300 - 195) / 195 = 53.8 % -> 54.
+    result = compare_with_peers(
+        customer_spending={"Restaurants": 900},
+        customer_age=22,
+        peers=_young_peers(),
+        months=3,
+    )
+    row = result["by_category"]["Restaurants"]
+    assert row["my_monthly"] == 300.0
+    assert row["age_group"] == {
+        "peer_median_monthly": 195.0,
+        "peer_typical_range_monthly": [97.5, 292.5],
+        "difference_from_median_pct": 54.0,
+        "spends_more_than_pct_of_peers": 76.3,
+        "spends_less_than_pct_of_peers": 23.7,  # 100 - 76.3
+        "level": "above_peers",
+    }
+    assert result["age_group"] == "18–24"
+    assert result["peers_in_age_group"] == 40
+    assert result["profile"]["overall_level"] == "above_peers"
+    assert [r["category"] for r in result["profile"]["above_peers"]] == ["Restaurants"]
+
+
+def test_missing_categories_count_as_zero_not_as_missing():
+    # Half the peers never travel. If they were skipped instead of counted as
+    # 0 €, the median would be 100 instead of 50.
+    peers = [{"age": 30, "spending": {"Travel": 300}} for _ in range(20)]
+    peers += [{"age": 30, "spending": {}} for _ in range(20)]
+    row = compare_with_peers(
+        customer_spending={}, customer_age=30, peers=peers, months=3,
+    )["by_category"]["Travel"]
+    assert row["my_monthly"] == 0.0
+    assert row["age_group"]["peer_median_monthly"] == 50.0  # (0 + 100) / 2
+    # 20 peers tie at 0: (0 + 20 / 2) / 40 = 25 % -> bottom quarter.
+    assert row["age_group"]["spends_more_than_pct_of_peers"] == 25.0
+    assert row["age_group"]["spends_less_than_pct_of_peers"] == 75.0
+    assert row["age_group"]["level"] == "below_peers"
+
+
+def test_age_group_and_everyone_are_compared_separately():
+    young = [{"age": 20, "spending": {"Groceries": 300}} for _ in range(MIN_PEERS)]
+    older = [{"age": 50, "spending": {"Groceries": 900}} for _ in range(MIN_PEERS)]
+    row = compare_with_peers(
+        customer_spending={"Groceries": 600}, customer_age=20,
+        peers=young + older, months=3,
+    )["by_category"]["Groceries"]
+    # 200 a month vs young peers' 100 and everyone's median (100 + 300) / 2.
+    assert row["age_group"]["peer_median_monthly"] == 100.0
+    assert row["age_group"]["level"] == "above_peers"
+    assert row["everyone"]["peer_median_monthly"] == 200.0
+    assert row["everyone"]["spends_more_than_pct_of_peers"] == 50.0
+
+
+def test_total_sums_categories_per_person():
+    peers = [{"age": 40, "spending": {"A": 30, "B": 60}} for _ in range(MIN_PEERS)]
+    result = compare_with_peers(
+        customer_spending={"A": 30}, customer_age=40, peers=peers, months=3,
+    )
+    assert result["total"]["my_monthly"] == 10.0
+    assert result["total"]["age_group"]["peer_median_monthly"] == 30.0
+    assert result["total"]["age_group"]["difference_from_median_pct"] == -67.0
+    assert result["profile"]["overall_level"] == "below_peers"
+
+
+def test_zero_median_has_no_percent_difference():
+    peers = [{"age": 40, "spending": {}} for _ in range(MIN_PEERS)]
+    row = compare_with_peers(
+        customer_spending={"Travel": 30}, customer_age=40, peers=peers, months=1,
+    )["by_category"]["Travel"]
+    assert row["age_group"]["difference_from_median_pct"] is None
+    assert row["age_group"]["spends_more_than_pct_of_peers"] == 100.0
+
+
+def test_too_few_peers_is_an_error():
+    peers = [{"age": 80, "spending": {}} for _ in range(MIN_PEERS - 1)]
+    with pytest.raises(ValueError, match="peers"):
+        compare_with_peers(customer_spending={}, customer_age=80, peers=peers, months=1)
+
+
+@pytest.mark.parametrize("months", [0, -1, 1.5, True])
+def test_compare_with_peers_rejects_bad_months(months):
+    with pytest.raises(ValueError):
+        compare_with_peers(customer_spending={}, customer_age=40, peers=[], months=months)
+
+
+def test_compare_with_peers_rejects_negative_spending():
+    peers = [{"age": 40, "spending": {}} for _ in range(MIN_PEERS)]
+    with pytest.raises(ValueError):
+        compare_with_peers(customer_spending={"A": -5}, customer_age=40, peers=peers, months=1)
+
+
+def test_excluded_categories_stay_in_the_comparison_but_not_the_profile():
+    peers = [{"age": 40, "spending": {"Housing": 3000, "Restaurants": 300}} for _ in range(MIN_PEERS)]
+    result = compare_with_peers(
+        customer_spending={"Housing": 900, "Restaurants": 90},
+        customer_age=40, peers=peers, months=3,
+        exclude_from_profile=["Housing"],
+    )
+    # Both are far below peers, but only Restaurants is a habit to highlight.
+    assert result["by_category"]["Housing"]["age_group"]["level"] == "below_peers"
+    assert [r["category"] for r in result["profile"]["below_peers"]] == ["Restaurants"]
+    # Rent still counts in the total: 330 vs 1100 a month.
+    assert result["total"]["my_monthly"] == 330.0
+    assert result["total"]["age_group"]["peer_median_monthly"] == 1100.0
+
+
+def test_profile_entries_carry_only_the_rank_that_fits_them():
+    # Customer: high on A (top), low on B (bottom). An "above" entry offers
+    # only "spends more than", a "below" entry only "spends less than", so
+    # the model can't report 15 % where 85 % is meant.
+    peers = [{"age": 40, "spending": {"A": 30 * i, "B": 30 * i}} for i in range(40)]
+    profile = compare_with_peers(
+        customer_spending={"A": 1170, "B": 0}, customer_age=40, peers=peers, months=3,
+    )["profile"]
+    assert profile["above_peers"] == [{
+        "category": "A", "my_monthly": 390.0, "peer_median_monthly": 195.0,
+        "spends_more_than_pct_of_peers": 98.8,  # (39 + 0.5) / 40
+    }]
+    assert profile["below_peers"] == [{
+        "category": "B", "my_monthly": 0.0, "peer_median_monthly": 195.0,
+        # "More than" is (0 + 0.5) / 40 = 1.25 -> 1.3 %; the two always add to 100.
+        "spends_less_than_pct_of_peers": 98.7,
+    }]
