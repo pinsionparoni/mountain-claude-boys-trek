@@ -194,6 +194,21 @@ The data ends on 30 September 2026, so by default the coach treats each customer
 
 Unit tests need no database or model: a fake connection stands in for PostgreSQL. Data audits that read the live database are scripts, not tests: see `scripts/audits/`.
 
+## 9. Web API
+
+```bash
+.venv/bin/uvicorn coach.api:app --reload          # http://localhost:8000, try it at /docs
+```
+
+| Endpoint | What it returns |
+|---|---|
+| `POST /chat` | Body `{"customer_id": "CUST00001", "message": "...", "conversation_id": null}`. The answer streamed as server-sent events: `conversation` (`{"conversation_id"}`, send it back with the next message), `tool` (`{"name"}` while the coach looks something up), `text` (`{"text"}`, pieces of the answer in order), `error`, `done`. |
+| `GET /customers/{id}/summary` | Spending in the three baskets, this month so far by default (`start_date`, `end_date` optional). |
+| `GET /customers/{id}/budget` | The monthly budget and safe to spend this week (same as the coach's `get_safe_to_spend`). |
+| `GET /health` | `{"ok": true, "model": "gemma"}` |
+
+`COACH_TODAY` and `COACH_MODEL` apply to the API too. Conversations are kept in memory (a restart forgets them), and there is no login: fine for the demo, not for real customers.
+
 ## Project layout
 
 The AI never touches the database directly. It calls tools; the tools use the query layer for data and the calculations module for maths.
@@ -209,7 +224,8 @@ flowchart LR
 
 | Path | Purpose |
 |---|---|
-| `coach/agent.py` | The coach: system prompt (customer context) and the chat loops for Gemma and Claude |
+| `coach/agent.py` | The coach: system prompt (customer context) and the chat loops for Gemma (streaming) and Claude |
+| `coach/api.py` | FastAPI web API for the front end |
 | `coach/tools/spending.py` | The customer-scoped tools the model calls (data tools plus the calculations) |
 | `coach/database/queries.py` | The SQL queries |
 | `coach/database/connection.py` | One shared, read-only PostgreSQL connection |
@@ -247,6 +263,5 @@ Basket rules: [BASKETS.md](BASKETS.md), implemented in `coach/spending_baskets.p
 
 ## Next steps
 
-- FastAPI web API around `chat()` for the mobile front end.
 - Run the calculations in Modal Sandboxes.
 - Decide where the backend runs for the demo (Modal, Aiven or Verda).
