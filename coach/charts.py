@@ -157,3 +157,31 @@ def this_month(today: date) -> tuple[date, date]:
 def last_month(today: date) -> tuple[date, date]:
     end = today.replace(day=1) - timedelta(days=1)
     return end.replace(day=1), end
+
+
+def offer_args(calls: list[tuple[str, dict]]) -> dict | None:
+    """
+    The show_chart arguments for the chart that matches what the coach looked up,
+    when it didn't pick a chart itself: the app then offers it behind a button.
+
+    ``calls`` are the turn's successful tool calls, oldest first, as (name, arguments).
+    The last call that has a matching chart decides; None when nothing fits (small
+    talk, a definition, a what-if, single transactions).
+    """
+    for name, args in reversed(calls):
+        args = args or {}
+        period = {k: args[k] for k in ("start_date", "end_date") if k in args}
+        if name == "get_spending_by_category":
+            if args.get("category"):
+                return {"kind": "trend", "category": args["category"]}
+            return {"kind": "categories", **period}
+        if name == "get_basket_summary":
+            return {"kind": "categories", **period}
+        if name == "get_monthly_balance_trend":
+            months = args.get("months", 6)
+            return {"kind": "balance", "months": min(max(int(months), 2), 12) if isinstance(months, (int, float)) else 6}
+        if name == "get_safe_to_spend":
+            return {"kind": "budget"}
+        if name == "compare_with_peers":
+            return {"kind": "peers"}
+    return None

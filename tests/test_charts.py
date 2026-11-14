@@ -139,3 +139,39 @@ def test_tool_passes_the_category_to_the_peers_chart(monkeypatch):
     tool().run({"kind": "peers"})
     tool().run({"kind": "peers", "category": "Groceries"})
     assert asked == [None, "Groceries"]
+
+
+# --------------------------------------------------------------------------
+# Offering a chart when the coach didn't pick one
+# --------------------------------------------------------------------------
+
+@pytest.mark.parametrize("calls, expected", [
+    ([("get_spending_by_category", {"start_date": "2026-08-01", "end_date": "2026-08-31"})],
+     {"kind": "categories", "start_date": "2026-08-01", "end_date": "2026-08-31"}),
+    ([("get_spending_by_category", {"start_date": "2026-03-01", "end_date": "2026-08-31", "category": "Restaurants"})],
+     {"kind": "trend", "category": "Restaurants"}),
+    ([("get_basket_summary", {"start_date": "2026-08-01", "end_date": "2026-08-31"})],
+     {"kind": "categories", "start_date": "2026-08-01", "end_date": "2026-08-31"}),
+    ([("get_monthly_balance_trend", {"months": 1})], {"kind": "balance", "months": 2}),
+    ([("get_monthly_balance_trend", {})], {"kind": "balance", "months": 6}),
+    ([("get_safe_to_spend", {})], {"kind": "budget"}),
+    ([("compare_with_peers", {})], {"kind": "peers"}),
+    # the last lookup that has a chart decides
+    ([("get_safe_to_spend", {}), ("get_transactions", {}), ("compare_with_peers", {})], {"kind": "peers"}),
+    ([("compare_with_peers", {}), ("calculate_what_if", {})], {"kind": "peers"}),
+])
+def test_offer_matches_the_lookup(calls, expected):
+    assert charts.offer_args(calls) == expected
+
+
+@pytest.mark.parametrize("calls", [[], [("calculate_what_if", {})], [("get_transactions", {})],
+                                   [("calculate_safe_to_save", {})]])
+def test_no_offer_when_no_chart_fits(calls):
+    assert charts.offer_args(calls) is None
+
+
+def test_agent_offers_a_chart_from_the_lookups(monkeypatch):
+    monkeypatch.setattr(charts, "budget", lambda c, t: {"type": "budget"})
+    tools = {t.name: t for t in spending.load_tools("CUST00001", TODAY)}
+    assert agent._offered_chart(tools, [("get_safe_to_spend", {})]) == {"type": "budget"}
+    assert agent._offered_chart(tools, [("calculate_what_if", {})]) is None

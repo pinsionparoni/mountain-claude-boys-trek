@@ -128,4 +128,9 @@ export interface ChatMessage {
   author: "user" | "assistant";
   text: string;
   charts?: ChartSpec[];
+  /** Where the chart shows: "above" the text when the customer asked for a chart,
+   *  "below" once they tap "Show as a chart"; unset = behind the button. */
+  chartOpen?: "above" | "below";
+  /** True while the answer is still arriving. */
+  streaming?: boolean;
 }
