@@ -66,9 +66,11 @@
 
   /* VERIFIED: family names and available weights.
      Add licensed local @font-face declarations separately when approved.
-     Local Arial/system fallbacks are not an exact visual match. */
-  --sp-font-body: "S Bonus UX", Arial, system-ui, sans-serif;
-  --sp-font-display: "S Bonus Display", "Arial Narrow", Arial, sans-serif;
+     Rubik (open licence, bundled in styles/fonts.css) stands in for them:
+     a similar soft, sturdy feel. S Bonus stays first, so licensed fonts
+     would win if they were ever added. */
+  --sp-font-body: "S Bonus UX", "Rubik", Arial, system-ui, sans-serif;
+  --sp-font-display: "S Bonus Display", "Rubik", "Arial Narrow", Arial, sans-serif;
   --sp-weight-regular: 400;
   --sp-weight-medium: 500;
   --sp-weight-semibold: 600;

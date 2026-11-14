@@ -53,6 +53,7 @@ export const text = {
       loginTitle: "Log in to S-mobiili",
       loginLead: "Junction demo: choose a language and a synthetic customer.",
       loginButton: "Log in",
+      loggingIn: "Logging in…",
       // S-Etukortti page
       bonusAndPurchases: "Bonus and purchases",
       yourBenefits: "Your benefits",
@@ -179,6 +180,7 @@ export const text = {
       loginTitle: "Kirjaudu S-mobiiliin",
       loginLead: "Junction-demo: valitse kieli ja synteettinen asiakas.",
       loginButton: "Kirjaudu sisään",
+      loggingIn: "Kirjaudutaan…",
       bonusAndPurchases: "Bonus ja ostot",
       yourBenefits: "Sinun etusi",
       showAll: "Näytä kaikki",

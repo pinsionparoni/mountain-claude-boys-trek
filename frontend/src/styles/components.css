@@ -592,54 +592,126 @@ html, body, #root { block-size: 100%; overflow: hidden; }
 .s-logo { display: inline-block; aspect-ratio: 148 / 233; background-color: currentColor; mask-size: contain; mask-repeat: no-repeat; mask-position: center; -webkit-mask-size: contain; -webkit-mask-repeat: no-repeat; -webkit-mask-position: center; }
 
 /* Login */
+/* Log-in: S-mobiili's green start screen with a white bottom sheet that slides up
+   once the logo animation ends. Durations come from tokens.css and drop to 0 for
+   people who ask for reduced motion. */
 .sm-login { flex: 1; display: grid; grid-template-rows: 1fr auto; background: #00aa45; color: var(--sp-white); overflow-y: auto; }
-.sm-login-logo { display: grid; place-items: center; min-block-size: 260px; }
+.sm-login-logo { display: grid; place-items: center; min-block-size: 240px; }
 .sm-login-logo video { inline-size: 240px; block-size: 240px; }
 .sm-login-static { block-size: 128px; color: var(--sp-white); }
 .sm-login-form {
   display: grid;
-  gap: var(--sp-space-3);
-  margin: 0 var(--sp-space-4) var(--sp-space-6);
-  padding: var(--sp-space-6) var(--sp-space-5);
-  border-radius: 24px;
+  gap: var(--sp-space-4);
+  padding: var(--sp-space-8) var(--sp-space-5) var(--sp-space-6);
+  border-radius: 28px 28px 0 0;
   background: var(--sp-white);
   color: var(--sp-neutral-strongest);
+  box-shadow: 0 -10px 30px rgb(0 70 40 / 0.12);
   opacity: 0;
-  transform: translateY(16px);
+  transform: translateY(48px);
   transition: opacity var(--sp-duration-slow) var(--sp-ease-entry), transform var(--sp-duration-slow) var(--sp-ease-entry);
   pointer-events: none;
 }
 .sm-login-form.is-visible { opacity: 1; transform: none; pointer-events: auto; }
-.sm-login-title { font-size: 1.4rem; line-height: 1.2; font-weight: var(--sp-weight-bold); color: var(--sp-green-strong); }
-.sm-login-lead { color: var(--sp-neutral-secondary); font-size: 0.95rem; }
-.sm-login-lang { justify-self: start; }
-.sm-login-lang button { padding-inline: var(--sp-space-4); }
-.sm-login-field { display: grid; gap: var(--sp-space-1); font-size: var(--sp-font-size-small); color: var(--sp-neutral-secondary); }
+.sm-login-title { font-size: 1.6rem; line-height: 1.15; font-weight: var(--sp-weight-semibold); letter-spacing: -0.01em; color: var(--sp-green-strong); }
+.sm-login-lead { margin-block-start: calc(-1 * var(--sp-space-2)); color: var(--sp-neutral-secondary); font-size: 0.95rem; line-height: 1.45; }
+
+/* Language: a segmented control; the chosen half lifts out in white. */
+.lang-switch.sm-login-lang {
+  justify-self: stretch;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  padding: 4px;
+  border: 0;
+  background: var(--sp-green-pale);
+}
+.lang-switch.sm-login-lang button {
+  min-block-size: 40px;
+  border-radius: var(--sp-radius-pill);
+  background: transparent;
+  color: var(--sp-green-strong);
+  font-weight: var(--sp-weight-medium);
+  transition: background-color var(--sp-duration-fast) var(--sp-ease-default),
+    color var(--sp-duration-fast) var(--sp-ease-default), box-shadow var(--sp-duration-fast) var(--sp-ease-default);
+}
+.lang-switch.sm-login-lang button[aria-pressed="true"] {
+  background: var(--sp-white);
+  color: var(--sp-green-strongest);
+  font-weight: var(--sp-weight-semibold);
+  box-shadow: 0 1px 4px rgb(0 70 40 / 0.16);
+}
+
+.sm-login-field { display: grid; gap: 6px; font-size: var(--sp-font-size-small); font-weight: var(--sp-weight-medium); color: var(--sp-neutral-stronger); }
 .sm-login-field select,
 .sm-login-field input {
-  min-block-size: var(--sp-control-min-height);
-  padding-inline: var(--sp-space-3);
-  border: 1px solid var(--sp-border-default);
-  border-radius: var(--sp-radius-input);
+  min-block-size: 52px;
+  padding-inline: var(--sp-space-4);
+  border: 1.5px solid var(--sp-border-default);
+  border-radius: 14px;
   background: var(--sp-white);
   color: var(--sp-neutral-strongest);
   font: inherit;
   font-size: 1rem;
+  font-weight: var(--sp-weight-regular);
   max-inline-size: 100%;
+  transition: border-color var(--sp-duration-fast) var(--sp-ease-default), box-shadow var(--sp-duration-fast) var(--sp-ease-default);
 }
+/* The picker's own arrow, so it looks the same on Android, iPhone and desktop. */
+.sm-login-field select {
+  appearance: none;
+  padding-inline-end: 44px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23007841' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 14px center;
+  background-size: 20px;
+  text-overflow: ellipsis;
+}
+.sm-login-field select:hover,
+.sm-login-field input:hover { border-color: var(--sp-green-medium); }
+.sm-login-field select:focus-visible,
+.sm-login-field input:focus-visible {
+  outline: none;
+  border-color: var(--sp-green-strong);
+  box-shadow: 0 0 0 4px rgb(0 170 70 / 0.2);
+}
+.sm-login-field input[aria-invalid="true"] { border-color: var(--sp-error-border); }
+.sm-login-field input[aria-invalid="true"]:focus-visible { box-shadow: 0 0 0 4px rgb(183 0 0 / 0.15); }
+
 .sm-login-button {
-  min-block-size: 52px;
+  min-block-size: 54px;
+  margin-block-start: var(--sp-space-2);
   border: 0;
   border-radius: var(--sp-radius-pill);
   background: var(--sp-green-strong);
   color: var(--sp-white);
   font: inherit;
   font-size: 1.05rem;
-  font-weight: var(--sp-weight-bold);
+  font-weight: var(--sp-weight-semibold);
   cursor: pointer;
+  transition: background-color var(--sp-duration-fast) var(--sp-ease-default), transform var(--sp-duration-faster) var(--sp-ease-default);
 }
-.sm-login-error { margin: 0; font-size: var(--sp-font-size-small); color: var(--sp-error-text); }
-.sm-login-badge { justify-self: center; font-size: 0.8rem; color: var(--sp-neutral-secondary); }
+.sm-login-button:hover { background: var(--sp-green-strongest); }
+.sm-login-button:active { transform: scale(0.98); }
+.sm-login-button:focus-visible { outline: var(--sp-focus-width) solid var(--sp-focus-color); outline-offset: var(--sp-focus-offset); }
+.sm-login-button:disabled { cursor: progress; opacity: 0.75; transform: none; }
+
+.sm-login-error {
+  margin: calc(-1 * var(--sp-space-2)) 0 0;
+  font-size: var(--sp-font-size-small);
+  color: var(--sp-error-text);
+  animation: sm-fade-in var(--sp-duration-moderate) var(--sp-ease-entry);
+}
+@keyframes sm-fade-in { from { opacity: 0; transform: translateY(-4px); } }
+
+.sm-login-badge {
+  justify-self: center;
+  padding: 4px 12px;
+  border-radius: var(--sp-radius-pill);
+  background: var(--sp-surface-neutral);
+  font-size: 0.78rem;
+  color: var(--sp-neutral-secondary);
+}
 
 /* Home: Bonus hero, counts, receipts */
 .sm-hero-logo { block-size: 52px; color: var(--sp-green-medium); }
