@@ -8,3 +8,8 @@ const eur = new Intl.NumberFormat("fi-FI", {
 });
 
 export const formatMoney = (amountEur: number): string => eur.format(amountEur);
+
+const wholeEur = new Intl.NumberFormat("fi-FI", { style: "currency", currency: "EUR", maximumFractionDigits: 0 });
+
+/** Whole euros ("115 €") for chart labels, where cents only add clutter. */
+export const formatWholeMoney = (amountEur: number): string => wholeEur.format(amountEur);

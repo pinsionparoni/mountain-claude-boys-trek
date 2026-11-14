@@ -67,7 +67,9 @@ taxis, cafés, alcohol) over a period is get_spending_by_category, never this on
 by category, comparisons with other people, or charts. Report the numbers in `result` as given. In your answer, \
 say in one plain sentence what you counted, over which period and what an average is per ("Laskin kahvila- ja \
 pikaruokaostosi viimeisten 12 kuukauden ajalta: ostat niitä keskimäärin 3 kertaa viikossa."). Never mention code, \
-pandas, a sandbox or tables. Answer in the language of the customer's question."""
+pandas, a sandbox or tables. If the purchases fall in only a few months, say so next to the average \
+("keskimäärin 2 kertaa kuukaudessa, mutta kaikki ostot osuvat kolmelle kuukaudelle: syyskuulle, helmikuulle ja \
+elokuulle"), so an average never hides uneven spending. Answer in the language of the customer's question."""
 
 TOOL_DESCRIPTION = f"""Run a short pandas calculation over the customer's own transactions from the last 12 months \
 (up to today), in an isolated sandbox. `df` is a pandas DataFrame with one row per transaction:
@@ -76,7 +78,9 @@ TOOL_DESCRIPTION = f"""Run a short pandas calculation over the customer's own tr
 naming what each number is (e.g. result = {{"total_eur": 495.6, "per_month_eur": 41.3, "purchases": 38, \
 "months_counted": 12.0}}). Every average must say what it is per and how many it was divided by: \
 "per day" divides by the number of calendar days of that kind (from `days`), not by 5 or 2; "per purchase" by the \
-number of purchases. Spending questions use kind == "spending" only. Don't print, read files or use the network. \
+number of purchases. With any monthly or weekly average, also return how many months had purchases \
+(e.g. "months_with_purchases": 3, "months_counted": 12.0), so the answer can say when spending is uneven. \
+Spending questions use kind == "spending" only. Don't print, read files or use the network. \
 Afterwards, tell the customer in one plain sentence what you counted and over which period, in the language \
 of their question."""
 

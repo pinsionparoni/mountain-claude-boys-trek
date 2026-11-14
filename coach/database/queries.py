@@ -52,7 +52,8 @@ def spending_by_category(
         SELECT
             COALESCE(category, 'Uncategorized') AS category,
             SUM(-tx_amount_eur) AS total_spending_eur,
-            COUNT(*) AS transaction_count
+            COUNT(*) AS transaction_count,
+            COUNT(DISTINCT DATE_TRUNC('month', tx_date)) AS months_with_purchases
         FROM transactions
         WHERE customer_id = %s
           AND tx_date >= %s

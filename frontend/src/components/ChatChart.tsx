@@ -5,7 +5,7 @@
 import type { ReactNode } from "react";
 import { formatDay, locales, type Lang, type Text } from "../lib/i18n";
 import { basketName, categoryName } from "../lib/merchants";
-import { formatMoney } from "../lib/money";
+import { formatMoney, formatWholeMoney } from "../lib/money";
 import type { ChartSpec } from "../lib/types";
 
 interface Props {
@@ -69,22 +69,32 @@ export function ChatChart({ chart, t, lang }: Props) {
     const what = category ? categoryName(category, lang) : basket ? basketName(basket, lang) : null;
     const max = Math.max(...chart.months.map((m) => m.value), 0);
     const peak = chart.months.reduce((a, m, i) => (m.value > chart.months[a].value ? i : a), 0);
+    const last = chart.months.length - 1;
+    // Label the peak, and the latest month too when it has spending and sits apart from the peak
+    // (neighbouring labels would collide on a phone).
+    const labelled = (i: number) => (i === peak && max > 0) || (i === last && chart.months[i].value > 0 && peak < last - 1);
+    // Many months: name every third one, counted back from the latest, so names never wrap.
+    const named = (i: number) => chart.months.length <= 7 || (last - i) % 3 === 0;
     return (
       <Frame t={t} title={what ? c.trendOf(what) : c.trendAll}
              rows={chart.months.map((m) => ({
                label: `${monthName(m.month, lang)}${m.partial ? ` (${c.soFar})` : ""}`, value: formatMoney(m.value) }))}>
         <div className="columns" style={{ gridTemplateColumns: `repeat(${chart.months.length}, minmax(0, 1fr))` }}>
-          {chart.months.map((m, i) => {
-            const label = i === peak || i === chart.months.length - 1;  // the peak and the latest month
-            return (
-              <div key={m.month} className={`column${m.partial ? " is-partial" : ""}`}
-                   title={`${monthName(m.month, lang)}: ${formatMoney(m.value)}${m.partial ? ` (${c.soFar})` : ""}`}>
-                <span className="column-value money">{label ? formatMoney(Math.round(m.value)) : ""}</span>
-                <span className="column-track"><span className="column-fill" style={{ blockSize: pct(m.value, max) }} /></span>
-                <span className="column-month">{monthName(m.month, lang)}</span>
-              </div>
-            );
-          })}
+          {chart.months.map((m, i) => (
+            <div key={m.month} className={`column${m.partial ? " is-partial" : ""}`}
+                 title={`${monthName(m.month, lang)}: ${formatMoney(m.value)}${m.partial ? ` (${c.soFar})` : ""}`}>
+              <span className="column-track">
+                <span className="column-fill" style={{ blockSize: pct(m.value, max) }}>
+                  {labelled(i) && (
+                    <span className={`column-value money${i === 0 ? " at-start" : i === last ? " at-end" : ""}`}>
+                      {formatWholeMoney(m.value)}
+                    </span>
+                  )}
+                </span>
+              </span>
+              <span className="column-month">{named(i) ? monthName(m.month, lang).replace(".", "") : ""}</span>
+            </div>
+          ))}
         </div>
         {chart.months.at(-1)?.partial && <p className="chat-chart-note">{monthName(chart.months.at(-1)!.month, lang)}: {c.soFar}</p>}
       </Frame>
