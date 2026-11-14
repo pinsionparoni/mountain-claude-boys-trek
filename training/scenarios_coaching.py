@@ -926,10 +926,7 @@ def build_s12(ctx, cid: str, today: date, lang: str, variant: int) -> dict:
     b_args = {"start_date": s6, "end_date": e6}
     b_str, b_data = ctx.run_tool(cid, today, "get_basket_summary", b_args)
 
-    income_avg = round(sum(
-        f["monthly_average_eur"] for f in b_data["financial_flows"]
-        if f["transaction_type"] in ("salary", "other_income") and f["monthly_average_eur"] > 0
-    ), 2)
+    income_avg = b_data["monthly_income_eur"]  # added up by the tool, not here
     reg_avg = b_data["baskets"]["regular_essentials"]["monthly_average_eur"]
     unexp_avg = b_data["baskets"]["unexpected_necessities"]["monthly_average_eur"]
     ev_avg = b_data["baskets"]["everyday_spending"]["monthly_average_eur"]

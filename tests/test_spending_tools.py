@@ -245,10 +245,22 @@ def test_basket_tool_adds_averages_and_sweep_warning(tools, monkeypatch):
     flows = {f["transaction_type"]: f for f in result["financial_flows"]}
     assert flows["salary"]["monthly_average_eur"] == 1014.58  # 3000 * 30.4375 / 90
     assert flows["salary_sweep"]["monthly_average_eur"] == -84.7
+    assert result["monthly_income_eur"] == 1014.58  # salary only; sweeps are not income
 
     assert result["has_salary_sweep"] is True
     assert result["swept_share_of_salary_pct"] == 8.3
     assert "minimum" in result["salary_sweep_note"]
+
+
+def test_basket_tool_adds_up_salary_and_other_income(tools, monkeypatch):
+    monkeypatch.setattr(queries, "consumption_transactions", lambda *args: [])
+    monkeypatch.setattr(queries, "financial_flows", lambda *args: [
+        {"transaction_type": "salary", "net_amount_eur": Decimal("3000.00"), "transaction_count": 3},
+        {"transaction_type": "other_income", "net_amount_eur": Decimal("300.00"), "transaction_count": 1},
+        {"transaction_type": "investment_deposit", "net_amount_eur": Decimal("-90.00"), "transaction_count": 1},
+    ])
+    result = run(tools, "get_basket_summary", Q1)
+    assert result["monthly_income_eur"] == 1014.58 + 101.46  # both incomes, not the investment
 
 
 def test_basket_tool_without_sweeps_has_no_warning(tools, monkeypatch):

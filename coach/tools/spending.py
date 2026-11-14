@@ -330,6 +330,13 @@ def load_tools(customer_id, today=None):
             flow["monthly_average_eur"] = calculations.monthly_equivalent(
                 flow["net_amount_eur"], days
             )
+        # Salary plus other income per month, added here so the coach never adds them itself
+        # (e.g. as monthly_income for calculate_safe_to_save).
+        summary["monthly_income_eur"] = _eur(sum(
+            (Decimal(str(f["monthly_average_eur"])) for f in summary["financial_flows"]
+             if f["transaction_type"] in spending_baskets.INCOME_TYPES and f["monthly_average_eur"] > 0),
+            Decimal(0),
+        ))
         return summary
 
     def monthly_balance_trend(args):
@@ -448,7 +455,8 @@ def load_tools(customer_id, today=None):
                 "unexpected_necessities, everyday_spending), each with its label, share, monthly average and "
                 "categories split by merchant type, plus unusual_purchases (large one-off purchases). "
                 "Separately the money movements (income, salary sweeps, investments) with has_salary_sweep and "
-                "a caveat when salary leaves the account."
+                "a caveat when salary leaves the account, and monthly_income_eur: salary plus other income per "
+                "month (use it as monthly_income for calculate_safe_to_save)."
             ),
             properties=dict(_DATE_PROPERTIES),
             required=["start_date", "end_date"],
