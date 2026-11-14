@@ -26,8 +26,19 @@ def _connect():
         connect_timeout=10,
         row_factory=dict_row,
         autocommit=True,
-        # The coach only ever reads; the database rejects any write.
-        options="-c default_transaction_read_only=on",
+        # A long-lived connection can die silently (an idle network path dropped
+        # without either end being told). Then every query waited forever: the
+        # hosted demo hung for its full 10-minute limit. Keepalive probes find a
+        # dead connection within about a minute, unacknowledged data counts as a
+        # broken connection after 30 s, and get_connection() opens a new one.
+        keepalives=1,
+        keepalives_idle=30,
+        keepalives_interval=10,
+        keepalives_count=3,
+        tcp_user_timeout=30_000,
+        # The coach only ever reads; the database rejects any write. No query
+        # may run past 2 minutes (the slowest, the peer population, takes 7-28 s).
+        options="-c default_transaction_read_only=on -c statement_timeout=120000",
     )
 
 
