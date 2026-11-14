@@ -182,7 +182,7 @@ COACH_MODEL=claude .venv/bin/python -m coach --customer CUST00001   # override t
 
 A terminal chat for testing. `--customer` sets which customer's transactions the coach may read (or set `COACH_CUSTOMER_ID` in `.env`). Without it the coach has no access to any customer data. Ctrl+D quits.
 
-Questions to try (S-Bank's "Ask your money" plus our own): "Where did my money go last month?", "What can I safely spend this week?", "How much did I spend on taxis last month?", "Mihin rahani menevät? Jaa kulutukseni kolmeen koriin viime kuukaudelta.", "How much could I save per year if I cut restaurant spending by 20%?"
+Questions to try (S-Bank's "Ask your money" plus our own): "Where did my money go last month?", "What can I safely spend this week?", "How much did I spend on taxis last month?", "Mihin rahani menevät? Jaa kulutukseni kolmeen koriin viime kuukaudelta.", "How much could I save per year if I cut restaurant spending by 20%?", "What kind of spender am I?"
 
 The data ends on 30 September 2026, so by default the coach treats each customer's last transaction date as "today". That is the last day of a month, so for demos set a date mid-month, e.g. `COACH_TODAY=2026-09-10 .venv/bin/python -m coach --customer CUST00001`, to show a month in progress.
 
@@ -207,7 +207,7 @@ Unit tests need no database or model: a fake connection stands in for PostgreSQL
 | `GET /customers/{id}/budget` | The monthly budget and safe to spend this week (same as the coach's `get_safe_to_spend`). |
 | `GET /health` | `{"ok": true, "model": "gemma"}` |
 
-`COACH_TODAY` and `COACH_MODEL` apply to the API too. Conversations are kept in memory (a restart forgets them), and there is no login: fine for the demo, not for real customers.
+`COACH_TODAY` and `COACH_MODEL` apply to the API too. At startup the API loads every customer's spending for the peer comparison in the background (about 10 seconds against Aiven, then cached), so the first "What kind of spender am I?" may wait for it. Conversations are kept in memory (a restart forgets them), and there is no login: fine for the demo, not for real customers.
 
 ## 10. Run the whole app (backend + frontend)
 
@@ -258,7 +258,8 @@ flowchart LR
 | `coach/database/connection.py` | One shared, read-only PostgreSQL connection |
 | `coach/spending_baskets.py` | What counts as spending, and which basket each transaction belongs to |
 | `coach/budget.py` | Monthly budget and safe to spend this week: gathers the customer's history and calls the calculations |
-| `coach/calculations.py` | Budget, safe-to-spend, safe-to-save and what-if maths: plain Python, no database or model |
+| `coach/peers.py` | "What kind of spender am I?": loads every customer's spending (cached) and calls the peer comparison in the calculations |
+| `coach/calculations.py` | Budget, safe-to-spend, safe-to-save, what-if and peer-comparison maths: plain Python, no database or model |
 | `coach/web_search.py` | Optional Exa tools, only loaded when `COACH_WEB_SEARCH=1` |
 | `coach/__main__.py` | Terminal chat: `python -m coach --customer CUST00001` |
 | `frontend/` | React + Vite mobile web app (see step 10) |
@@ -282,6 +283,7 @@ Each tool is bound to the customer the app chose when the tools were created; no
 | `get_safe_to_spend` | "What can I safely spend this week?" The monthly budget (income − 🏠 essentials − 🔧 reserve − savings = ☕ everyday budget), how much is left this month, and a cash check until the next payday. Computed in `coach/budget.py`. |
 | `calculate_safe_to_save` | "How much could I save each month?" |
 | `calculate_what_if` | "How much would I save if I cut dining out by 20%?" |
+| `compare_with_peers` | "What kind of spender am I?" The customer against people their age and against all 5,100 customers, over the last 12 complete months: per category and per basket, the monthly amount, the peer median and typical range, and the share of peers who spend less or more. A profile lists the habits that stand out (rent and utilities left out). Only medians and ranks reach the model, never another customer's data. Computed in `coach/peers.py`. |
 
 Basket rules: [BASKETS.md](BASKETS.md), implemented in `coach/spending_baskets.py`.
 
