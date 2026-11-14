@@ -202,10 +202,14 @@ Unit tests need no database or model: a fake connection stands in for PostgreSQL
 
 | Endpoint | What it returns |
 |---|---|
-| `POST /chat` | Body `{"customer_id": "CUST00001", "message": "...", "conversation_id": null}`. The answer streamed as server-sent events: `conversation` (`{"conversation_id"}`, send it back with the next message), `tool` (`{"name"}` while the coach looks something up), `text` (`{"text"}`, pieces of the answer in order), `error`, `done`. |
+| `POST /chat` | Body `{"customer_id": "CUST00001", "message": "...", "conversation_id": null}`. The answer streamed as server-sent events: `conversation` (`{"conversation_id"}`, send it back with the next message), `tool` (`{"name"}` while the coach looks something up), `chart` (a chart spec from `coach/charts.py` to draw above the answer), `text` (`{"text"}`, pieces of the answer in order), `error`, `done`. |
 | `GET /customers/{id}/summary` | Spending in the three baskets, this month so far by default (`start_date`, `end_date` optional). |
 | `GET /customers/{id}/budget` | The monthly budget and safe to spend this week (same as the coach's `get_safe_to_spend`). |
-| `GET /health` | `{"ok": true, "model": "gemma"}` |
+| `GET /customers/{id}/receipts` | The latest card purchases up to "today", newest first, each with its merchant type and basket (`limit`, default 30, at most 100). |
+| `GET /health` | `{"ok": true, "model": "gemma", "passcode_required": false}`. Always open. |
+| `GET /passcode` | 200 if the `X-Demo-Passcode` header is right, else 401 (the login screen uses it). |
+
+With `DEMO_PASSCODE` set (the hosted demo, step 12), every endpoint except `/health` answers 401 without the `X-Demo-Passcode` header. **New endpoints that return data must add `dependencies=PROTECTED`.** Locally the variable is unset and nothing is checked; to try the login as in the demo, start the API with `DEMO_PASSCODE=test`.
 
 `COACH_TODAY` and `COACH_MODEL` apply to the API too. At startup the API loads every customer's spending for the peer comparison in the background (about 10 seconds against Aiven, then cached), so the first "What kind of spender am I?" may wait for it. Conversations are kept in memory (a restart forgets them), and there is no login: fine for the demo, not for real customers.
 
@@ -234,7 +238,7 @@ Demo customers (in the header's picker, chosen for `COACH_TODAY=2026-09-10`):
 | CUST00127 (24) | Everyday budget nearly used, about €59 a week |
 | CUST00001 (63) | Older customer, for contrast |
 
-Frontend code: `frontend/src/`. Visual design is in `styles/tokens.css` (colours, fonts, spacing) and `config/ui.config.ts` (optional sections on/off); all UI text in both languages is in `lib/i18n.ts`. Check with `npm run build` and `npm run lint`.
+Frontend code: `frontend/src/`. Visual design is in `styles/tokens.css` (colours, fonts, spacing; the font is Rubik, bundled in `styles/fonts.css` as an open-licence stand-in for S-Pankki's own S Bonus fonts) and `config/ui.config.ts` (optional sections on/off); all UI text in both languages is in `lib/i18n.ts`. Check with `npm run build` and `npm run lint`.
 
 ## 11. Open it on your phone
 
@@ -320,10 +324,13 @@ flowchart LR
 | `coach/spending_baskets.py` | What counts as spending, and which basket each transaction belongs to |
 | `coach/budget.py` | Monthly budget and safe to spend this week: gathers the customer's history and calls the calculations |
 | `coach/peers.py` | "What kind of spender am I?": loads every customer's spending (cached) and calls the peer comparison in the calculations |
+| `coach/charts.py` | The charts the coach can show (`show_chart`): builds each chart's data from the query layer, no numbers from the model |
 | `coach/calculations.py` | Budget, safe-to-spend, safe-to-save, what-if and peer-comparison maths: plain Python, no database or model |
 | `coach/web_search.py` | Optional Exa tools, only loaded when `COACH_WEB_SEARCH=1` |
 | `coach/__main__.py` | Terminal chat: `python -m coach --customer CUST00001` |
 | `frontend/` | React + Vite mobile web app (see step 10) |
+| `frontend/src/components/` | Screens and parts: `LoginScreen`, `SmobiiliHome`, `ReceiptsPage` (real receipts), `CardCarousel` + `BasketCard` (swipeable cards above the chat), `Chat` + `ChatChart` (the coach and its charts) |
+| `frontend/src/lib/merchants.ts` | Finnish and English names for merchant types, categories and baskets |
 | `scripts/load_data.py` | Loads `data/*.csv` into PostgreSQL (`DATABASE_URL`) |
 | `scripts/profile_data.py` | Regenerates [DATA.md](DATA.md) from the CSVs |
 | `scripts/fetch_statfin.py` | Downloads Statistics Finland's household spending by age and writes `coach/statfin_data.py` (the open benchmark). Re-run to refresh; the app itself never calls Statistics Finland |
@@ -346,7 +353,8 @@ Each tool is bound to the customer the app chose when the tools were created; no
 | `get_safe_to_spend` | "What can I safely spend this week?" The monthly budget (income − 🏠 essentials − 🔧 reserve − savings = ☕ everyday budget), how much is left this month, and a cash check until the next payday. Computed in `coach/budget.py`. |
 | `calculate_safe_to_save` | "How much could I save each month?" |
 | `calculate_what_if` | "How much would I save if I cut dining out by 20%?" |
-| `compare_with_peers` | "What kind of spender am I?" The customer against people their age and against all 5,100 customers, over the last 12 complete months: per category and per basket, the monthly amount, the peer median and typical range, and the share of peers who spend less or more. A profile lists the habits that stand out (rent and utilities left out). Only medians and ranks reach the model, never another customer's data. Computed in `coach/peers.py`. |
+| `compare_with_peers` | "What kind of spender am I?" The customer against people their age and against all 5,100 customers, over the last 12 complete months: per category and per basket, the monthly amount, the peer median and typical range, and the share of peers who spend less or more. A profile lists the habits that stand out (rent and utilities left out). Where a category maps, also Statistics Finland's average for Finnish households of the same age (open data, `coach/statfin.py`). Only medians and ranks reach the model, never another customer's data. Computed in `coach/peers.py`. |
+| `show_chart` | Not a question but a picture: the coach calls it when its answer compares numbers, and the app draws the chart above the answer. The model picks `kind` (`categories`, `trend`, `balance`, `budget`, `peers`, the last with an optional category for one category in detail) and the period, category or basket; every number is computed in `coach/charts.py`. At most one chart per answer. |
 
 Basket rules: [BASKETS.md](BASKETS.md), implemented in `coach/spending_baskets.py`.
 

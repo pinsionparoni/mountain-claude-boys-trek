@@ -123,7 +123,14 @@ Source: [hackjunction/Junction-2026-S-pankki](https://github.com/hackjunction/Ju
 - **Age groups** are Statistics Finland's household budget survey bands (18–24, 25–34, …, 65–74, 75+), so they line up with official benchmarks if we add them. Smallest group: 75+ with 130 customers.
 - A **profile** lists the habits that stand out (top or bottom quarter of the age group). Rent and utilities stay in the comparison but out of the profile: they reflect living situation, not habits.
 - **Privacy:** the model only sees medians and ranks, never another customer's data.
+- **Open-data benchmark:** next to our customers, Statistics Finland's household budget survey (2022, StatFin 14q4): what Finnish households of the same age spend per month per consumption unit, moved to current prices with the CPI. Only food, restaurants, transport, health and entertainment map cleanly, so only those are compared. Downloaded once by `scripts/fetch_statfin.py` into `coach/statfin_data.py` (CC BY 4.0); the app never calls Statistics Finland. The two benchmarks can disagree (a customer typical among our customers can spend 81% above the Finnish average), and the coach says so.
 - **How:** one query (`population_spending`) totals every customer's spending per category and basket. Baskets are placed in SQL with a lookup table generated from the Python rules, so the rules live only in `coach/spending_baskets.py`. It takes about 10 s on the Developer-1 plan, so the API loads it in the background at startup and caches it. Maths in `coach/calculations.py`, wiring in `coach/peers.py`.
+
+### Charts in the chat
+
+- The `show_chart` tool lets the model pick a chart when an answer compares numbers: spending by category, a monthly trend (category, basket or all), the balance, the budget per basket, or the customer against people their age (all categories, or one in detail with the Finnish average).
+- The model never writes numbers into a chart: `coach/charts.py` computes them from the query layer, the agent passes the chart on as a `chart` stream event, and `frontend/src/components/ChatChart.tsx` draws it above the answer.
+- Drawn with plain HTML/SVG (no chart library), one S-Pankki green and a validated grey, sparing labels, hover values and a hidden table for screen readers.
 
 ### Optional: Exa web search
 
@@ -149,12 +156,13 @@ The hosted demo (https://arvon-johannes--financial-coach.modal.run) stores and p
 ## Build order
 
 1. **Data:** ✅ done. Aiven PostgreSQL 18 (Frankfurt, Developer-1 plan) loaded with all 3.6M transactions via `scripts/load_data.py`.
-2. **Tools:** ✅ done. Eight customer-scoped tools in `coach/tools/spending.py`, on a read-only query layer (`coach/database/queries.py`) and the basket rules (`coach/spending_baskets.py`), including safe-to-spend and the peer comparison.
+2. **Tools:** ✅ done. Nine customer-scoped tools in `coach/tools/spending.py`, on a read-only query layer (`coach/database/queries.py`) and the basket rules (`coach/spending_baskets.py`), including safe-to-spend, the peer comparison and charts.
 3. **Model switch:** ✅ done. `COACH_MODEL=gemma|claude`. Next: a fixed set of 10–20 questions from the brief to compare models and catch regressions.
 4. **Gemma on Verda:** ✅ done. `gemma-coach` container running Gemma 4 31B (FP8), tested in English and Finnish.
 4b. **Web API:** ✅ done. FastAPI in `coach/api.py` with a streamed chat (see [SETUP.md § 9](SETUP.md#9-web-api)).
 5. **Calculations:** ✅ done in plain Python (`coach/calculations.py`, `coach/budget.py`, `coach/peers.py`). Next: run them in Modal Sandboxes.
-6. **Front end:** ✅ first version in `frontend/` (React + Vite): live cards, streamed chat, English and Finnish. Polish in progress.
+6. **Front end:** ✅ `frontend/` (React + Vite): S-mobiili mock-up with a restyled login, real receipts, swipeable cards and charts in the chat, English and Finnish; installable on phones and hosted on Modal (SETUP steps 11–12). Polish in progress.
+6b. **Open data:** ✅ Statistics Finland benchmark in the peer comparison and its charts.
 7. **Add-ons:** Nemotron receipts, CRACI CI, ElevenLabs voice if time allows.
 
 The S-Pankki challenge is the main prize: a polished coach beats many half-working integrations. Stop adding challenges if the core isn't solid.
