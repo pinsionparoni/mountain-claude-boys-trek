@@ -5,12 +5,14 @@ The customer is fixed when the tools are created: ``load_tools(customer_id)``.
 No tool accepts a customer ID, and unexpected arguments are rejected, so the
 model can never read another customer's data, even if it tries.
 
-Seven tools:
+Eight tools:
 
 - Data (PostgreSQL): ``get_spending_by_category``, ``get_basket_summary``,
   ``get_monthly_balance_trend``, ``get_transactions``.
 - Budget (``coach/budget.py``): ``get_safe_to_spend``: the monthly budget,
   this month's progress and a cash check until payday, all computed in Python.
+- Peers (``coach/peers.py``): ``compare_with_peers``: the customer's spending
+  against people their age and everyone, as medians and ranks only.
 - Calculations (plain Python, see ``coach/calculations.py``):
   ``calculate_safe_to_save``, ``calculate_what_if``.
 
@@ -30,7 +32,7 @@ import json
 from datetime import date
 from decimal import Decimal
 
-from coach import budget, calculations, spending_baskets
+from coach import budget, calculations, peers, spending_baskets
 from coach.database import queries
 
 # First and last day of the S-Pankki dataset, from the full-table audit.
@@ -57,6 +59,15 @@ large one-off Health or Home & Tech purchases are unexpected necessities. Purcha
 "other". Explain the placement when it matters and that the customer can see things differently.
 - For questions about one kind of merchant (taxis, fuel, pharmacies, cafés), call get_spending_by_category with \
 that category to get its merchant types. Mention unusual_purchases when they explain a month.
+- For "what kind of spender am I?", "is my spending normal?" or comparisons with other people, call compare_with_peers. \
+Lead with profile.overall_level and the total against people their age, then the categories in profile.above_peers and \
+profile.below_peers. For above_peers use spends_more_than_pct_of_peers ("you spend more on restaurants than 80% of \
+people aged 18–24"); for below_peers use spends_less_than_pct_of_peers ("you spend less on travel than 77% of people \
+your age"). Report these numbers as given; never subtract them yourself. \
+Name the age group and the period. Describe habits kindly and without judging; spending less is not always better. \
+Rent and utilities are left out of the profile because they reflect living situation; mention them only if asked. \
+Spending less than peers does not mean the customer has money to spare: before suggesting they have room to spend, \
+save or treat themselves, call get_safe_to_spend and base the suggestion on it.
 - Salary, other income, salary sweeps and investments are money movements, not spending. They are never in the baskets.
 - If get_basket_summary says has_salary_sweep is true, tell the customer that their mandatory totals may be incomplete, \
 using salary_sweep_note."""
@@ -306,6 +317,9 @@ def load_tools(customer_id, today=None):
             **optional,
         )
 
+    def peer_comparison(args):
+        return peers.compare(customer_id, today)
+
     def what_if(args):
         return calculations.what_if_reduce_many(
             monthly_by_category=args["monthly_by_category"],
@@ -386,6 +400,20 @@ def load_tools(customer_id, today=None):
             properties={},
             required=[],
             handler=safe_to_spend,
+        ),
+        CoachTool(
+            name="compare_with_peers",
+            description=(
+                "How the customer's spending compares with people their age (Statistics Finland age bands) "
+                "and with all customers, over the last 12 complete months. Per category and in total: "
+                "my_monthly, the peer median and typical range, difference_from_median_pct, "
+                "spends_more_than_pct_of_peers and a level (above_peers, typical, below_peers). profile lists "
+                "the habits that stand out against the age group, largest first; rent and utilities are left "
+                "out of it. Only aggregates; no other customer's data. Everything is computed; just explain it."
+            ),
+            properties={},
+            required=[],
+            handler=peer_comparison,
         ),
         CoachTool(
             name="calculate_safe_to_save",

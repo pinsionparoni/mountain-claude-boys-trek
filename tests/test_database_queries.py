@@ -286,3 +286,60 @@ def test_balance_as_of(fake_db):
     assert queries.balance_as_of("CUST1", date(2026, 9, 18)) == 812.35
     assert fake_db.cursors[0].calls[0][1] == ("CUST1", date(2026, 9, 18))
     assert queries.balance_as_of("CUST1", date(2020, 1, 1)) is None
+
+
+# --- Peer population -------------------------------------------------------
+
+
+@pytest.fixture
+def fresh_population_cache():
+    queries.population_spending_by_category.cache_clear()
+    yield
+    queries.population_spending_by_category.cache_clear()
+
+
+def test_population_counts_only_consumption_in_the_period(fake_db, fresh_population_cache):
+    fake_db.queue([])
+
+    queries.population_spending_by_category(START, END)
+
+    query, params = fake_db.cursors[0].calls[0]
+    assert params == (START, END, CONSUMPTION_TRANSACTION_TYPES)
+    assert "tx_amount_eur < 0" in query
+    # Every customer is returned, including ones with no spending at all.
+    assert "FROM customers AS c" in query
+    assert "LEFT JOIN spending" in query
+
+
+def test_population_rows_are_shaped_with_float_totals(fake_db, fresh_population_cache):
+    fake_db.queue([
+        {"customer_id": "CUST00001", "age": 63,
+         "spending": {"Groceries": Decimal("812.40"), "Travel": 99}},
+        {"customer_id": "CUST00002", "age": 21, "spending": {}},
+    ])
+
+    rows = queries.population_spending_by_category(START, END)
+
+    assert rows == (
+        {"customer_id": "CUST00001", "age": 63,
+         "spending": {"Groceries": 812.4, "Travel": 99.0}},
+        {"customer_id": "CUST00002", "age": 21, "spending": {}},
+    )
+    assert isinstance(rows[0]["spending"]["Groceries"], float)
+
+
+def test_population_is_cached_per_period(fake_db, fresh_population_cache):
+    fake_db.queue([], [])
+
+    first = queries.population_spending_by_category(START, END)
+    again = queries.population_spending_by_category(START, END)
+    queries.population_spending_by_category(START, date(2026, 6, 30))
+
+    assert first is again
+    assert len(fake_db.cursors) == 2  # one database call per distinct period
+
+
+def test_population_rejects_reversed_dates(fake_db, fresh_population_cache):
+    with pytest.raises(ValueError):
+        queries.population_spending_by_category(END, START)
+    assert fake_db.cursors == []

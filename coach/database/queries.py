@@ -1,5 +1,6 @@
 
 from datetime import date
+from functools import lru_cache
 
 from coach.database.connection import get_connection
 from coach.spending_baskets import (
@@ -435,3 +436,79 @@ def balance_as_of(customer_id: str, day: date) -> float | None:
             row = cur.fetchone()
 
     return round(float(row["balance_after_eur"]), 2) if row else None
+
+
+@lru_cache(maxsize=4)
+def population_spending_by_category(
+    start_date: date,
+    end_date: date,
+) -> tuple[dict, ...]:
+    """
+    Return every customer's age and spending per category in a period: the
+    peer population for "what kind of spender am I?" comparisons.
+
+    One row per customer (all 5,100), as ``{"customer_id", "age",
+    "spending": {category: total_eur}}``. A category the customer did not
+    spend on is absent from ``spending``: callers must count it as 0 €, not
+    leave the customer out, or the peer medians come out too high.
+    Spending means the same as in ``spending_by_category`` (consumption only).
+    Dates are inclusive.
+
+    This scans the whole population (a 12-month period takes about 4-6 s
+    against Aiven), so results are cached per period: the dataset never
+    changes while the app runs. Treat the result as read-only.
+
+    Privacy: this is other customers' data. Only aggregates computed from it
+    (medians, percentile ranks) may reach the coach, never these rows.
+    """
+    if start_date > end_date:
+        raise ValueError("start_date cannot be after end_date")
+
+    # One row per customer with its categories packed into JSON: 5,100 rows
+    # instead of ~50,000 customer-category rows, which halves the transfer.
+    query = """
+        WITH spending AS (
+            SELECT
+                customer_id,
+                COALESCE(category, 'Uncategorized') AS category,
+                SUM(-tx_amount_eur) AS total_eur
+            FROM transactions
+            WHERE tx_date >= %s
+              AND tx_date <= %s
+              AND tx_amount_eur < 0
+              AND transaction_type = ANY(%s)
+            GROUP BY 1, 2
+        )
+        SELECT
+            c.customer_id,
+            c.age,
+            COALESCE(
+                jsonb_object_agg(s.category, ROUND(s.total_eur, 2))
+                    FILTER (WHERE s.category IS NOT NULL),
+                '{}'::jsonb
+            ) AS spending
+        FROM customers AS c
+        LEFT JOIN spending AS s USING (customer_id)
+        GROUP BY c.customer_id, c.age
+        ORDER BY c.customer_id;
+    """
+
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                query,
+                (start_date, end_date, CONSUMPTION_TRANSACTION_TYPES),
+            )
+            rows = cur.fetchall()
+
+    return tuple(
+        {
+            "customer_id": row["customer_id"],
+            "age": row["age"],
+            "spending": {
+                category: round(float(total), 2)
+                for category, total in row["spending"].items()
+            },
+        }
+        for row in rows
+    )

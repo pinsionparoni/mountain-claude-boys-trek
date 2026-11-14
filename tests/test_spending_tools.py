@@ -26,6 +26,7 @@ EXPECTED_TOOLS = {
     "get_safe_to_spend",
     "calculate_safe_to_save",
     "calculate_what_if",
+    "compare_with_peers",
 }
 
 Q1 = {"start_date": "2026-01-01", "end_date": "2026-03-31"}  # 90 days
@@ -375,3 +376,70 @@ def test_transactions_tool_formats_rows(tools, monkeypatch):
     }
     assert result["transactions"][1]["merchant_type"] == "bill"
     assert result["transactions"][2]["merchant_type"] is None  # income, not spending
+
+
+# --------------------------------------------------------------------------
+# compare_with_peers
+# --------------------------------------------------------------------------
+
+
+from coach import peers  # noqa: E402
+
+
+@pytest.mark.parametrize(
+    "today, start, end",
+    [
+        (date(2026, 9, 10), date(2025, 9, 1), date(2026, 8, 31)),
+        (date(2026, 9, 30), date(2025, 9, 1), date(2026, 8, 31)),  # current month never counts
+        (date(2026, 1, 5), date(2025, 1, 1), date(2025, 12, 31)),
+    ],
+)
+def test_peer_period_is_the_last_12_complete_months(today, start, end):
+    assert peers.peer_period(today) == (start, end)
+
+
+def _population():
+    me = {"customer_id": "CUST00001", "age": 22,
+          "spending": {"Restaurants": 3600, "Housing": 1200}}
+    others = [{"customer_id": f"CUST1{i:04d}", "age": 21,
+               "spending": {"Restaurants": 1200, "Housing": 12000}} for i in range(40)]
+    return (me, *others)
+
+
+def test_compare_with_peers_tool_takes_no_arguments_and_uses_today(monkeypatch):
+    asked = []
+
+    def fake_population(start, end):
+        asked.append((start, end))
+        return _population()
+
+    monkeypatch.setattr(queries, "population_spending_by_category", fake_population)
+    tool = {t.name: t for t in spending.load_tools("CUST00001", date(2026, 9, 10))}["compare_with_peers"]
+
+    with pytest.raises(ValueError, match="unexpected"):
+        tool.run({"customer_id": "CUST00002"})  # can't pick another customer
+
+    result = json.loads(tool.run({}))
+    assert asked == [(date(2025, 9, 1), date(2026, 8, 31))]
+    assert result["age_group"] == "18–24"
+    assert result["peers_in_age_group"] == 40  # the customer is not their own peer
+    # 300 a month vs peers' 100: top of the group.
+    assert result["by_category"]["Restaurants"]["my_monthly"] == 300.0
+    assert [r["category"] for r in result["profile"]["above_peers"]] == ["Restaurants"]
+    # Very low rent stays in the comparison but is not called a habit.
+    assert result["by_category"]["Housing"]["age_group"]["level"] == "below_peers"
+    assert result["profile"]["below_peers"] == []
+    assert result["not_in_profile"] == ["Housing", "Utilities"]
+
+
+def test_compare_with_peers_returns_no_other_customer_ids(monkeypatch):
+    monkeypatch.setattr(queries, "population_spending_by_category", lambda s, e: _population())
+    tool = {t.name: t for t in spending.load_tools("CUST00001", date(2026, 9, 10))}["compare_with_peers"]
+    assert "CUST1" not in tool.run({})
+
+
+def test_compare_with_peers_unknown_customer(monkeypatch):
+    monkeypatch.setattr(queries, "population_spending_by_category", lambda s, e: _population())
+    tool = {t.name: t for t in spending.load_tools("CUST09999", date(2026, 9, 10))}["compare_with_peers"]
+    with pytest.raises(ValueError, match="Unknown customer"):
+        tool.run({})
