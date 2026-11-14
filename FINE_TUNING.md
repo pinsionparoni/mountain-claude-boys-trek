@@ -1,6 +1,6 @@
 # Fine-tuning plan
 
-**Status: steps 1–10 done, pending native-speaker review** ([S_PANKKI_REFERENCE.md](S_PANKKI_REFERENCE.md) vocabulary/voice/rules, [POLICY.md](POLICY.md), guardrail and prompt rules, test set in `evals/coach/`, Gemma + Claude Opus baselines, and 280 verified training/validation conversations in `training/`). Nothing is trained yet. Related: [SETUP.md](SETUP.md) (how the coach runs), [BASKETS.md](BASKETS.md) (spending rules), `evals/finnish/` (Finnish language check).
+**Status: steps 1–10 done; training templates reviewed by a native speaker on 14 Nov 2026** ([S_PANKKI_REFERENCE.md](S_PANKKI_REFERENCE.md) vocabulary/voice/rules, [POLICY.md](POLICY.md), guardrail and prompt rules, test set in `evals/coach/`, Gemma + Claude Opus baselines in [RESULTS.md](RESULTS.md), and 280 verified training/validation conversations in `training/`). Nothing is trained yet; next is step 11. Related: [SETUP.md](SETUP.md) (how the coach runs), [BASKETS.md](BASKETS.md) (spending rules), `evals/finnish/` (Finnish language check).
 
 ## Goal
 
