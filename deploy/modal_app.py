@@ -1,8 +1,8 @@
 """
 The hosted demo on Modal: the built frontend and the coach API at one address.
 
-    https://<workspace>--financial-coach-web.modal.run/       the app (installable on phones)
-    https://<workspace>--financial-coach-web.modal.run/api/   the coach API (same paths as locally)
+    https://<workspace>--financial-coach.modal.run/       the app (installable on phones)
+    https://<workspace>--financial-coach.modal.run/api/   the coach API (same paths as locally)
 
 Deploy from the project root (frontend built first, Modal secret created once;
 see SETUP.md "Hosted demo on Modal"):
@@ -47,7 +47,11 @@ app = modal.App("financial-coach", image=image)
     timeout=10 * 60,  # long enough for a streamed chat answer
 )
 @modal.concurrent(max_inputs=50)
-@modal.asgi_app()
+# Address: https://arvon-johannes--financial-coach.modal.run. Modal also
+# answers at a ".us-east.modal.run" form of it: that's the region of Modal's
+# web gateway, which every request passes through (see "Where the data goes"
+# in TECH_STACK.md). The server itself runs in the EU (region="eu" above).
+@modal.asgi_app(label="financial-coach")
 def web():
     from fastapi import FastAPI
     from fastapi.staticfiles import StaticFiles

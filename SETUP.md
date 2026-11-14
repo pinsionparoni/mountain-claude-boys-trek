@@ -164,7 +164,7 @@ First start takes 15–30 minutes (image pull, ~62 GB model download, FP8 compre
 
 ## 6. Modal
 
-Used for the what-if calculation Sandboxes (in progress). Connect your machine once:
+Hosts the demo for phones and judges (step 12); planned for the what-if calculation Sandboxes too. Connect your machine once:
 
 ```bash
 .venv/bin/modal setup        # opens the browser to log in
@@ -258,8 +258,44 @@ With the backend and frontend running (step 10), in a third terminal:
 It prints an address like `https://some-random-words.trycloudflare.com`: open that on the phone. The frontend's `/api` forwarding works through it, chat answers stream as usual, and `frontend/vite.config.ts` allows `*.trycloudflare.com` hosts.
 
 - **The address changes every time** you restart the tunnel, and stops working when you stop it (Ctrl+C) or close the laptop.
-- **Anyone with the address can use the app**, and every chat message runs Gemma on Verda (paid). Share it only with the team and stop the tunnel when you're done. For judging we'll want a hosted version instead.
+- **Anyone with the address can use the app**, and every chat message runs Gemma on Verda (paid). Share it only with the team and stop the tunnel when you're done. For judging, use the hosted demo (step 12).
 - Warnings about `ping_group_range` / ICMP are harmless: the tunnel doesn't need ping.
+
+## 12. Hosted demo on Modal
+
+The permanent demo, for phones and judges, at one address:
+
+**https://arvon-johannes--financial-coach.modal.run**
+
+- The app asks for a **demo passcode** on the login screen (stored on the phone after the first log-in). It isn't in the repo: ask Taneli. Without it the coach and customer data answer 401; the page itself loads.
+- **Install it on a phone:** Android Chrome → ⋮ → *Install app* (it lands in the app drawer; drag it to the home screen). iPhone Safari → Share → *Add to Home Screen*. It opens full-screen like an app.
+- It runs in Taneli's Modal workspace `arvon-johannes`, with `region="eu"`: the server is in the EU (12.6 ms to Aiven in Frankfurt). Requests enter through Modal's web gateway in the US (AWS us-east-1; Modal also answers at `….us-east.modal.run`), encrypted. Say "the data is stored, processed and handled by the model in the EU", never "nothing leaves the EU": see "Where the data goes" in [TECH_STACK.md](TECH_STACK.md#where-the-data-goes).
+
+**Before a demo:**
+
+1. Verda: set Min replicas to **1** at least 20–30 minutes before (step 5), or the first chat waits for Gemma to start.
+2. Open the app a few minutes before: the server sleeps after 20 minutes without requests, and waking it (and preloading the peer comparison data) takes about 10–20 seconds.
+3. Afterwards: Verda Min replicas back to **0**. Modal costs nothing while the server sleeps.
+
+**How it's built:** `deploy/modal_app.py` serves the built frontend at `/` and the coach API at `/api` (the same path Vite forwards in development) from one server. There is only ever one container, because conversations live in its memory; a redeploy or a sleep forgets them. Pages are sent with `Cache-Control: no-cache` and the service worker always re-checks the page, so a redeploy reaches phones on their next visit.
+
+**Settings** are two Modal secrets, never files in the image:
+
+| Secret | Holds | Change it |
+|---|---|---|
+| `coach-env` | `DATABASE_URL`, `VERDA_BASE_URL`, `VERDA_API_KEY`, `COACH_MODEL`, `COACH_TODAY` | `.venv/bin/modal secret create coach-env --force KEY=value …` (all five; `--force` replaces the secret), then redeploy |
+| `coach-passcode` | `DEMO_PASSCODE` (letters, digits and dashes) | `.venv/bin/modal secret create coach-passcode --force DEMO_PASSCODE=new-code`, then redeploy |
+
+**Redeploy** after code changes (needs access to the workspace and `modal setup`, step 6):
+
+```bash
+(cd frontend && npm run build)               # the deploy uploads frontend/dist as it is
+.venv/bin/modal deploy deploy/modal_app.py
+```
+
+To try changes first without touching the demo, `.venv/bin/modal serve deploy/modal_app.py` runs a temporary copy at `https://arvon-johannes--financial-coach-dev.modal.run`; Ctrl+C removes it.
+
+**If a phone shows an old version** (for example after testing an older build): reload the page; if that doesn't help, clear the site's data (Chrome → Settings → Site settings → All sites → `modal.run`).
 
 ## Project layout
 
@@ -319,4 +355,3 @@ Basket rules: [BASKETS.md](BASKETS.md), implemented in `coach/spending_baskets.p
 ## Next steps
 
 - Run the calculations in Modal Sandboxes.
-- Decide where the backend runs for the demo (Modal, Aiven or Verda).

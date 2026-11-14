@@ -20,7 +20,7 @@ Full brief: [CHALLENGE.md](CHALLENGE.md)
 - **A monthly budget and safe to spend this week:** income minus essentials, a reserve for surprises and usual savings gives the everyday budget; the coach tells you what's left this week and checks your account can cover the bills before payday.
 - **"What kind of spender am I?":** compares your spending with people your age (Statistics Finland's age bands) and with everyone, per category and per basket: "you spend less on travel than 85% of people aged 18–24". Only medians and ranks are used, never another customer's data.
 - **Computes, doesn't guess:** every number comes from code run on your own transactions; the AI only explains it.
-- **Keeps customer data in Europe** by running Google's open Gemma 4 model on our own server at Verda, instead of sending it to an outside AI service.
+- **Keeps customer data in Europe:** stored in Frankfurt, processed on our own server in the EU, and answered by Google's open Gemma 4 model on our own Verda server in Finland instead of an outside AI service. One hop isn't in the EU, and we say so: see [Where the data goes](#where-the-data-goes).
 - **Optional benchmarks** from open sources such as Statistics Finland, without ever sending personal data to a search engine.
 
 ## How it works
@@ -29,7 +29,7 @@ Full brief: [CHALLENGE.md](CHALLENGE.md)
 flowchart LR
     U["Customer<br/>mobile web app"] --> API["Coach backend"]
 
-    subgraph EU["Verda (EU data centres)"]
+    subgraph V["Verda (EU, Finland)"]
         G["Gemma 4<br/>open model"]
     end
 
@@ -56,13 +56,27 @@ sequenceDiagram
     A-->>U: plain-language answer with the numbers
 ```
 
+## Where the data goes
+
+We want to be exact about this, because keeping customer data in Europe is part of our pitch. Try the demo at **https://arvon-johannes--financial-coach.modal.run** (ask us for the passcode).
+
+| Step | Where | What passes through or is kept there |
+|---|---|---|
+| 1. Phone → **Modal's web gateway** | **United States** (AWS us-east-1, Virginia) | Every request and answer: the app's files, the demo passcode, the chosen customer ID, chat messages and answers, the figures shown. HTTPS from the phone; the gateway handles the connection and forwards it to our server. We store nothing here. |
+| 2. **Coach server** (FastAPI on Modal) | **EU** (Modal `region="eu"`; 12.6 ms to the database in Frankfurt) | Runs the tools and calculations. Conversations are kept in memory only, and lost when the server sleeps or restarts. |
+| 3. **Database** (Aiven PostgreSQL) | **EU**: Frankfurt, Germany | All transactions, at rest. Read-only for the coach, one customer at a time. |
+| 4. **AI model** (Gemma 4 on Verda) | **EU**: Finland (Verda, a Finnish GPU cloud) | The conversation and the customer's figures from the tools: what the model needs to answer. |
+| Not used in the demo | Claude API (US; development only, `COACH_MODEL=claude`) and Exa web search (US; off, and never sent personal data) | Nothing |
+
+In short: **the data is stored, processed and handled by the AI model in the EU, but requests from the phone reach our server through Modal's web gateway in the US**, encrypted. That hop comes from how we host the hackathon demo; in S-mobiili the coach would run on S-Bank's own infrastructure. The data is S-Pankki's synthetic dataset. More in [TECH_STACK.md](TECH_STACK.md#where-the-data-goes).
+
 ## Built with
 
 | Technology | Role |
 |---|---|
 | **Gemma 4 31B** on **Verda** | The coach's AI model, self-hosted with vLLM on an H100 |
 | **Aiven PostgreSQL** | The S-Pankki synthetic dataset: 5,100 customers, 3.6M transactions |
-| **Modal** | Secure sandboxes for what-if and safe-to-spend calculations *(planned)* |
+| **Modal** | Hosts the demo app and coach API in its EU region; secure sandboxes for calculations *(planned)* |
 | **Claude** | Development and quality baseline |
 | **Exa** | Optional web search for public benchmarks |
 
