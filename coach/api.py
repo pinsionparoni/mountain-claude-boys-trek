@@ -14,6 +14,8 @@ Endpoints:
   - ``tool``: ``{"name": "get_safe_to_spend"}`` while the coach looks something up,
     so the app can show "checking your spending…".
   - ``text``: ``{"text": "..."}``, a piece of the answer; append them in order.
+  - ``chart``: a chart spec (coach/charts.py) to draw with the answer: the model
+    chose it, every number in it was computed from the customer's data.
   - ``guardrail``: ``{"label": "care" | "refuse"}`` when the question got a fixed reply
     instead of the coach (see POLICY.md).
   - ``error``: ``{"message": "..."}`` if something went wrong.
@@ -22,6 +24,8 @@ Endpoints:
 - ``GET /customers/{id}/summary``: spending in the three baskets for a period
   (default: this month so far), for basket cards. No AI involved.
 - ``GET /customers/{id}/budget``: the monthly budget and safe to spend this week.
+- ``GET /customers/{id}/receipts``: the latest card purchases up to "today",
+  newest first, each with its merchant type and basket. No AI involved.
 - ``GET /health``: is the API up, and does it need a demo passcode.
 - ``GET /passcode``: 200 if the ``X-Demo-Passcode`` header is right (for the login screen).
 
@@ -150,6 +154,8 @@ def chat(request: ChatRequest):
                     yield _event("text", {"text": value})
                 elif kind == "tool":
                     yield _event("tool", {"name": value})
+                elif kind == "chart":
+                    yield _event("chart", value)
                 elif kind == "guardrail":
                     yield _event("guardrail", {"label": value})
         except Exception as e:  # the stream has started, so report errors in it
@@ -176,3 +182,11 @@ def summary(customer_id: str, start_date: date | None = None, end_date: date | N
 @app.get("/customers/{customer_id}/budget", dependencies=PROTECTED)
 def monthly_budget(customer_id: str):
     return budget.safe_to_spend(customer_id, _today(customer_id))
+
+
+@app.get("/customers/{customer_id}/receipts", dependencies=PROTECTED)
+def receipts(customer_id: str, limit: int = 30):
+    if not 1 <= limit <= 100:
+        raise HTTPException(400, "limit must be between 1 and 100")
+    today = _today(customer_id)
+    return {"today": today.isoformat(), "receipts": queries.recent_purchases(customer_id, today, limit)}

@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { uiConfig } from "./config/ui.config";
-import { BasketOverview } from "./components/BasketOverview";
+import { BasketCard } from "./components/BasketCard";
 import { BottomNav, type Tab } from "./components/BottomNav";
+import { CardCarousel } from "./components/CardCarousel";
 import { Chat } from "./components/Chat";
 import { EtukorttiPage } from "./components/EtukorttiPage";
 import { BackIcon } from "./components/Icons";
@@ -9,12 +10,22 @@ import { LoginScreen } from "./components/LoginScreen";
 import { MessageCentre } from "./components/MessageCentre";
 import { MinaPage } from "./components/MinaPage";
 import { PankkiPage } from "./components/PankkiPage";
+import { ReceiptsPage } from "./components/ReceiptsPage";
 import { SafeToSpendCard } from "./components/SafeToSpendCard";
 import { SmobiiliHome } from "./components/SmobiiliHome";
 import { demoCustomers } from "./fixtures/demo";
-import { PasscodeError, checkPasscode, fetchBudget, fetchHealth, fetchSummary, rememberPasscode } from "./lib/api";
+import { PasscodeError, checkPasscode, fetchBudget, fetchHealth, fetchReceipts, fetchSummary, rememberPasscode } from "./lib/api";
 import { formatDay, text, type Lang } from "./lib/i18n";
-import type { BasketSummary, Budget } from "./lib/types";
+import type { BasketKey, BasketSummary, Budget, Receipts } from "./lib/types";
+
+const BASKETS: BasketKey[] = ["regular_essentials", "unexpected_necessities", "everyday_spending"];
+
+/** What a basket's spending this month is measured against, from the monthly budget. */
+const basketReference = (key: BasketKey, budget: Budget) => ({
+  regular_essentials: budget.monthly_budget.regular_essentials,
+  unexpected_necessities: budget.monthly_budget.unexpected_reserve,
+  everyday_spending: budget.this_month.everyday_budget,
+})[key];
 
 const LANG_KEY = "coach-lang";
 
@@ -37,9 +48,10 @@ export default function App() {
   const [loggedIn, setLoggedIn] = useState(false);
   const [tab, setTab] = useState<Tab>("home");
   // Message centre and coach open over the tabs, like full screens in S-mobiili.
-  const [overlay, setOverlay] = useState<null | "messages" | "coach">(null);
+  const [overlay, setOverlay] = useState<null | "messages" | "coach" | "receipts">(null);
   const [summary, setSummary] = useState<BasketSummary | null>(null);
   const [budget, setBudget] = useState<Budget | null>(null);
+  const [receipts, setReceipts] = useState<Receipts | null>(null);
   const [error, setError] = useState(false);
   // The hosted demo needs a passcode before any data loads (null: still asking the backend).
   const [passcodeRequired, setPasscodeRequired] = useState<boolean | null>(null);
@@ -61,6 +73,7 @@ export default function App() {
     setCustomerId(id);
     setSummary(null);
     setBudget(null);
+    setReceipts(null);
     setError(false);
   };
 
@@ -90,6 +103,10 @@ export default function App() {
         if (e instanceof PasscodeError) { setPasscodeError(true); setLoggedIn(false); }
         else setError(true);
       });
+    // Receipts load on their own, so a problem there never hides the cards.
+    fetchReceipts(customerId)
+      .then((r) => current && setReceipts(r))
+      .catch(() => current && setReceipts({ today: "", receipts: [] }));
     return () => { current = false; };
   }, [customerId, canLoad]);
 
@@ -108,7 +125,9 @@ export default function App() {
 
               <div className="sm-screen" hidden={overlay !== null}>
                 <main className="sm-scroll">
-                  {tab === "home" && <SmobiiliHome t={t} lang={lang} budget={budget}
+                  {tab === "home" && <SmobiiliHome t={t} lang={lang} budget={budget} summary={summary}
+                                                   latestReceipt={receipts?.receipts[0] ?? null}
+                                                   onOpenReceipts={() => setOverlay("receipts")}
                                                    onOpenMessages={openMessages} onLogout={logout} />}
                   {tab === "card" && <EtukorttiPage t={t} />}
                   {tab === "bank" && <PankkiPage t={t} lang={lang} budget={budget} summary={summary}
@@ -116,6 +135,11 @@ export default function App() {
                   {tab === "me" && <MinaPage t={t} customerId={customerId} onOpenMessages={openMessages} />}
                 </main>
                 <BottomNav t={t} active={tab} onSelect={setTab} />
+              </div>
+
+              <div className="sm-screen" hidden={overlay !== "receipts"}>
+                <ReceiptsPage t={t} lang={lang} receipts={receipts?.receipts ?? null} today={receipts?.today || null}
+                              summary={summary} onBack={() => setOverlay(null)} />
               </div>
 
               <div className="sm-screen" hidden={overlay !== "messages"}>
@@ -132,18 +156,18 @@ export default function App() {
                   <h1 className="sm-header-title">{t.appName}</h1>
                   <span />
                 </header>
-                <Chat key={customerId} customerId={customerId} t={t} showSuggestions={uiConfig.showSuggestionChips}>
+                <Chat key={customerId} customerId={customerId} t={t} lang={lang} showSuggestions={uiConfig.showSuggestionChips}>
                   {!error && !budget && <p className="panel muted">{t.loading}</p>}
-                  {budget && <SafeToSpendCard budget={budget} t={t} lang={lang} />}
-                  {uiConfig.showBasketOverview && summary && (
-                    <BasketOverview
-                      summary={summary}
-                      periodLabel={periodLabel(summary.period, lang)}
-                      showBars={uiConfig.showSpendingChart && uiConfig.chartStyle === "bars"}
-                      t={t}
-                      lang={lang}
-                    />
-                  )}
+                  <CardCarousel t={t}>
+                    {budget && <SafeToSpendCard budget={budget} t={t} lang={lang} />}
+                    {uiConfig.showBasketOverview && summary && budget && BASKETS.map((key) => (
+                      <BasketCard key={key} basketKey={key} basket={summary.baskets[key]}
+                                  reference={basketReference(key, budget)}
+                                  periodLabel={periodLabel(summary.period, lang)}
+                                  showBar={uiConfig.showSpendingChart && uiConfig.chartStyle === "bars"}
+                                  t={t} lang={lang} />
+                    ))}
+                  </CardCarousel>
                 </Chat>
               </div>
             </>

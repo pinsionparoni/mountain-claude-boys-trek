@@ -592,54 +592,126 @@ html, body, #root { block-size: 100%; overflow: hidden; }
 .s-logo { display: inline-block; aspect-ratio: 148 / 233; background-color: currentColor; mask-size: contain; mask-repeat: no-repeat; mask-position: center; -webkit-mask-size: contain; -webkit-mask-repeat: no-repeat; -webkit-mask-position: center; }
 
 /* Login */
+/* Log-in: S-mobiili's green start screen with a white bottom sheet that slides up
+   once the logo animation ends. Durations come from tokens.css and drop to 0 for
+   people who ask for reduced motion. */
 .sm-login { flex: 1; display: grid; grid-template-rows: 1fr auto; background: #00aa45; color: var(--sp-white); overflow-y: auto; }
-.sm-login-logo { display: grid; place-items: center; min-block-size: 260px; }
+.sm-login-logo { display: grid; place-items: center; min-block-size: 240px; }
 .sm-login-logo video { inline-size: 240px; block-size: 240px; }
 .sm-login-static { block-size: 128px; color: var(--sp-white); }
 .sm-login-form {
   display: grid;
-  gap: var(--sp-space-3);
-  margin: 0 var(--sp-space-4) var(--sp-space-6);
-  padding: var(--sp-space-6) var(--sp-space-5);
-  border-radius: 24px;
+  gap: var(--sp-space-4);
+  padding: var(--sp-space-8) var(--sp-space-5) var(--sp-space-6);
+  border-radius: 28px 28px 0 0;
   background: var(--sp-white);
   color: var(--sp-neutral-strongest);
+  box-shadow: 0 -10px 30px rgb(0 70 40 / 0.12);
   opacity: 0;
-  transform: translateY(16px);
+  transform: translateY(48px);
   transition: opacity var(--sp-duration-slow) var(--sp-ease-entry), transform var(--sp-duration-slow) var(--sp-ease-entry);
   pointer-events: none;
 }
 .sm-login-form.is-visible { opacity: 1; transform: none; pointer-events: auto; }
-.sm-login-title { font-size: 1.4rem; line-height: 1.2; font-weight: var(--sp-weight-bold); color: var(--sp-green-strong); }
-.sm-login-lead { color: var(--sp-neutral-secondary); font-size: 0.95rem; }
-.sm-login-lang { justify-self: start; }
-.sm-login-lang button { padding-inline: var(--sp-space-4); }
-.sm-login-field { display: grid; gap: var(--sp-space-1); font-size: var(--sp-font-size-small); color: var(--sp-neutral-secondary); }
+.sm-login-title { font-size: 1.6rem; line-height: 1.15; font-weight: var(--sp-weight-semibold); letter-spacing: -0.01em; color: var(--sp-green-strong); }
+.sm-login-lead { margin-block-start: calc(-1 * var(--sp-space-2)); color: var(--sp-neutral-secondary); font-size: 0.95rem; line-height: 1.45; }
+
+/* Language: a segmented control; the chosen half lifts out in white. */
+.lang-switch.sm-login-lang {
+  justify-self: stretch;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  padding: 4px;
+  border: 0;
+  background: var(--sp-green-pale);
+}
+.lang-switch.sm-login-lang button {
+  min-block-size: 40px;
+  border-radius: var(--sp-radius-pill);
+  background: transparent;
+  color: var(--sp-green-strong);
+  font-weight: var(--sp-weight-medium);
+  transition: background-color var(--sp-duration-fast) var(--sp-ease-default),
+    color var(--sp-duration-fast) var(--sp-ease-default), box-shadow var(--sp-duration-fast) var(--sp-ease-default);
+}
+.lang-switch.sm-login-lang button[aria-pressed="true"] {
+  background: var(--sp-white);
+  color: var(--sp-green-strongest);
+  font-weight: var(--sp-weight-semibold);
+  box-shadow: 0 1px 4px rgb(0 70 40 / 0.16);
+}
+
+.sm-login-field { display: grid; gap: 6px; font-size: var(--sp-font-size-small); font-weight: var(--sp-weight-medium); color: var(--sp-neutral-stronger); }
 .sm-login-field select,
 .sm-login-field input {
-  min-block-size: var(--sp-control-min-height);
-  padding-inline: var(--sp-space-3);
-  border: 1px solid var(--sp-border-default);
-  border-radius: var(--sp-radius-input);
+  min-block-size: 52px;
+  padding-inline: var(--sp-space-4);
+  border: 1.5px solid var(--sp-border-default);
+  border-radius: 14px;
   background: var(--sp-white);
   color: var(--sp-neutral-strongest);
   font: inherit;
   font-size: 1rem;
+  font-weight: var(--sp-weight-regular);
   max-inline-size: 100%;
+  transition: border-color var(--sp-duration-fast) var(--sp-ease-default), box-shadow var(--sp-duration-fast) var(--sp-ease-default);
 }
+/* The picker's own arrow, so it looks the same on Android, iPhone and desktop. */
+.sm-login-field select {
+  appearance: none;
+  padding-inline-end: 44px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23007841' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 14px center;
+  background-size: 20px;
+  text-overflow: ellipsis;
+}
+.sm-login-field select:hover,
+.sm-login-field input:hover { border-color: var(--sp-green-medium); }
+.sm-login-field select:focus-visible,
+.sm-login-field input:focus-visible {
+  outline: none;
+  border-color: var(--sp-green-strong);
+  box-shadow: 0 0 0 4px rgb(0 170 70 / 0.2);
+}
+.sm-login-field input[aria-invalid="true"] { border-color: var(--sp-error-border); }
+.sm-login-field input[aria-invalid="true"]:focus-visible { box-shadow: 0 0 0 4px rgb(183 0 0 / 0.15); }
+
 .sm-login-button {
-  min-block-size: 52px;
+  min-block-size: 54px;
+  margin-block-start: var(--sp-space-2);
   border: 0;
   border-radius: var(--sp-radius-pill);
   background: var(--sp-green-strong);
   color: var(--sp-white);
   font: inherit;
   font-size: 1.05rem;
-  font-weight: var(--sp-weight-bold);
+  font-weight: var(--sp-weight-semibold);
   cursor: pointer;
+  transition: background-color var(--sp-duration-fast) var(--sp-ease-default), transform var(--sp-duration-faster) var(--sp-ease-default);
 }
-.sm-login-error { margin: 0; font-size: var(--sp-font-size-small); color: var(--sp-error-text); }
-.sm-login-badge { justify-self: center; font-size: 0.8rem; color: var(--sp-neutral-secondary); }
+.sm-login-button:hover { background: var(--sp-green-strongest); }
+.sm-login-button:active { transform: scale(0.98); }
+.sm-login-button:focus-visible { outline: var(--sp-focus-width) solid var(--sp-focus-color); outline-offset: var(--sp-focus-offset); }
+.sm-login-button:disabled { cursor: progress; opacity: 0.75; transform: none; }
+
+.sm-login-error {
+  margin: calc(-1 * var(--sp-space-2)) 0 0;
+  font-size: var(--sp-font-size-small);
+  color: var(--sp-error-text);
+  animation: sm-fade-in var(--sp-duration-moderate) var(--sp-ease-entry);
+}
+@keyframes sm-fade-in { from { opacity: 0; transform: translateY(-4px); } }
+
+.sm-login-badge {
+  justify-self: center;
+  padding: 4px 12px;
+  border-radius: var(--sp-radius-pill);
+  background: var(--sp-surface-neutral);
+  font-size: 0.78rem;
+  color: var(--sp-neutral-secondary);
+}
 
 /* Home: Bonus hero, counts, receipts */
 .sm-hero-logo { block-size: 52px; color: var(--sp-green-medium); }
@@ -650,7 +722,45 @@ html, body, #root { block-size: 100%; overflow: hidden; }
 .sm-product-icon { inline-size: 30px; block-size: auto; }
 .sm-receipt-amount { font-size: 1.05rem; color: var(--sp-neutral-strongest); }
 .sm-heading-row { display: flex; align-items: baseline; justify-content: space-between; }
-.sm-heading-row .sm-link { cursor: default; }
+.sm-heading-row .sm-link { cursor: pointer; }
+
+/* Receipts: real card purchases, each marked with its basket's icon. */
+.sm-receipt-button {
+  display: block;
+  inline-size: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+  border-radius: 0 16px 16px 0;
+  transition: background-color var(--sp-duration-fast) var(--sp-ease-default);
+}
+.sm-receipt-button:hover { background: var(--sp-green-faint); }
+.sm-receipt-button:active { background: var(--sp-green-pale); }
+.sm-receipt-button .sm-row { border-block-end: 0; }
+.sm-receipt-icon {
+  display: grid;
+  place-items: center;
+  inline-size: 32px;
+  block-size: 32px;
+  border-radius: 50%;
+  background: var(--sp-green-pale);
+  font-size: 1rem;
+}
+.sm-receipt-flag {
+  justify-self: start;
+  margin-block-start: 2px;
+  padding: 1px 8px;
+  border-radius: var(--sp-radius-pill);
+  background: var(--sp-error-bg);
+  color: var(--sp-error-text);
+  font-size: 0.75rem;
+}
+.sm-receipts-lead { color: var(--sp-neutral-secondary); font-size: 0.95rem; }
+.sm-receipts-day { display: grid; gap: var(--sp-space-2); }
+.sm-receipts-day .sm-heading { font-size: 1.1rem; color: var(--sp-neutral-stronger); }
 
 /* Tab bar as buttons */
 .sm-tab { border: 0; background: none; font: inherit; font-size: 0.75rem; cursor: pointer; padding: 0; }
@@ -715,3 +825,222 @@ html, body, #root { block-size: 100%; overflow: hidden; }
 .sm-login { grid-template-columns: minmax(0, 1fr); }
 .sm-login-form { grid-template-columns: minmax(0, 1fr); min-inline-size: 0; }
 .sm-login-field select { inline-size: 100%; }
+
+/* ------------------------------------------------------------------------
+   Coach screen: swipeable cards (safe to spend, then one per basket) with
+   S-mobiili's grey dots. Scroll snapping does the swiping.
+   ------------------------------------------------------------------------ */
+
+.carousel { display: grid; gap: var(--sp-space-3); min-inline-size: 0; }
+.carousel-track {
+  display: flex;
+  gap: var(--sp-space-3);
+  overflow-x: auto;
+  overscroll-behavior-x: contain;   /* a swipe moves the cards, not the page */
+  scroll-snap-type: x mandatory;
+  scroll-behavior: smooth;
+  scrollbar-width: none;
+  border-radius: 16px;
+}
+.carousel-track::-webkit-scrollbar { display: none; }
+.carousel-track:focus-visible { outline: var(--sp-focus-width) solid var(--sp-focus-color); outline-offset: var(--sp-focus-offset); }
+.carousel-slide { flex: 0 0 100%; display: grid; scroll-snap-align: start; scroll-snap-stop: always; min-inline-size: 0; }
+.carousel-slide > .panel { block-size: 100%; align-content: start; }
+@media (prefers-reduced-motion: reduce) { .carousel-track { scroll-behavior: auto; } }
+
+/* Dots: 8 px like the home screen's, inside a 24 px tap target. */
+.carousel-dots { justify-content: center; gap: 0; }
+.carousel-dots button {
+  display: grid;
+  place-items: center;
+  inline-size: 24px;
+  block-size: 24px;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+}
+.carousel-dots button::before {
+  content: "";
+  inline-size: 8px;
+  block-size: 8px;
+  border-radius: 50%;
+  background: var(--sp-border-subtle);
+  transition: background-color var(--sp-duration-fast) var(--sp-ease-default), transform var(--sp-duration-fast) var(--sp-ease-default);
+}
+.carousel-dots button.on::before { background: var(--sp-neutral-secondary); transform: scale(1.15); }
+.carousel-dots button:focus-visible { outline: var(--sp-focus-width) solid var(--sp-focus-color); outline-offset: -2px; border-radius: 50%; }
+
+/* Basket cards */
+.sm-coach .basket-card { background: var(--sp-white); }
+.basket-card-title { display: flex; align-items: center; gap: var(--sp-space-2); }
+.basket-card-icon {
+  display: grid;
+  place-items: center;
+  inline-size: 32px;
+  block-size: 32px;
+  border-radius: 50%;
+  background: var(--sp-green-pale);
+  font-size: 1rem;
+}
+.basket-card-period { font-size: var(--sp-font-size-small); }
+.basket-card-bar { block-size: 8px; border-radius: var(--sp-radius-pill); background: var(--sp-green-pale); overflow: hidden; }
+.basket-card-bar-fill {
+  block-size: 100%;
+  border-radius: inherit;
+  background: var(--sp-green-medium);
+  transition: inline-size var(--sp-duration-slow) var(--sp-ease-entry);
+}
+.basket-card-bar.is-over .basket-card-bar-fill { background: var(--sp-error-text); }
+.basket-card-ref { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 2px var(--sp-space-3); font-size: var(--sp-font-size-small); }
+.basket-card-over { color: var(--sp-error-text); font-weight: var(--sp-weight-medium); }
+.basket-card-cats { display: grid; gap: 6px; margin: var(--sp-space-1) 0 0; padding: var(--sp-space-3) 0 0; list-style: none; border-block-start: 1px solid var(--sp-border-subtle); }
+.basket-card-cats li { display: flex; justify-content: space-between; gap: var(--sp-space-3); font-size: 0.95rem; }
+
+/* ------------------------------------------------------------------------
+   Charts in the coach's answers (ChatChart.tsx). One hue (S-Pankki green),
+   the validated grey #8a918d for "people your age" (3:1 on white, ΔE 8.4 to
+   the green for colour-blind readers). Thin marks, 4 px rounded data ends,
+   square at the baseline; text in text colours, never the series colour.
+   ------------------------------------------------------------------------ */
+
+.sp-coach { --chart-series: var(--sp-green-medium); --chart-peer: #8a918d; --chart-track: var(--sp-green-faint); }
+
+.chat-message--assistant { display: grid; gap: var(--sp-space-3); }
+.chat-chart {
+  display: grid;
+  gap: var(--sp-space-3);
+  margin: 0;
+  animation: sm-fade-in var(--sp-duration-moderate) var(--sp-ease-entry);
+}
+/* The chart comes first in the bubble; a hairline separates it from the text below. */
+.chat-chart:not(:last-child) { padding-block-end: var(--sp-space-3); border-block-end: 1px solid var(--sp-border-subtle); }
+.chat-chart-title { font-weight: var(--sp-weight-semibold); font-size: 0.95rem; color: var(--sp-neutral-strongest); }
+.chat-chart-note { font-size: 0.8rem; color: var(--sp-neutral-secondary); }
+
+/* Horizontal bars: categories, and the pairs in "you vs. peers". */
+.hbars, .pairs { display: grid; gap: var(--sp-space-2); }
+.hbar {
+  display: grid;
+  grid-template-columns: minmax(0, 8.5em) minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--sp-space-2);
+  font-size: 0.85rem;
+}
+.hbar-label, .pair-label { color: var(--sp-neutral-stronger); overflow-wrap: anywhere; }
+.hbar-track { display: block; block-size: 12px; }
+.hbar-fill {
+  display: block;
+  block-size: 100%;
+  border-radius: 0 4px 4px 0;    /* rounded at the data end, square at the baseline */
+  background: var(--chart-series);
+  transition: inline-size var(--sp-duration-slow) var(--sp-ease-entry);
+}
+.hbar-fill--peer { background: var(--chart-peer); }
+.hbar-value { font-variant-numeric: tabular-nums; color: var(--sp-neutral-strongest); font-size: 0.8rem; white-space: nowrap; }
+.hbar-value--peer { color: var(--sp-neutral-secondary); }
+
+.pair {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  column-gap: var(--sp-space-2);
+  row-gap: 2px;
+  align-items: center;
+  font-size: 0.85rem;
+}
+.pair-label { grid-column: 1 / -1; }
+.chart-legend { display: flex; flex-wrap: wrap; gap: var(--sp-space-1) var(--sp-space-4); font-size: 0.8rem; color: var(--sp-neutral-secondary); }
+.chart-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.swatch { display: inline-block; inline-size: 12px; block-size: 8px; border-radius: 2px; }
+.swatch--you { background: var(--chart-series); }
+.swatch--peer { background: var(--chart-peer); }
+
+/* Columns: a trend per month. The month in progress is a lighter step, so it
+   doesn't read as a drop. */
+.columns { display: grid; gap: 6px; align-items: end; }
+.column { display: grid; grid-template-rows: auto 96px auto; justify-items: center; gap: 4px; min-inline-size: 0; }
+.column-value { font-size: 0.72rem; color: var(--sp-neutral-strongest); white-space: nowrap; font-variant-numeric: tabular-nums; min-block-size: 1.1em; }
+.column-track { display: flex; align-items: end; inline-size: 100%; max-inline-size: 22px; block-size: 96px; border-block-end: 1px solid var(--sp-border-subtle); }
+.column-fill {
+  display: block;
+  inline-size: 100%;
+  border-radius: 4px 4px 0 0;
+  background: var(--chart-series);
+  transition: block-size var(--sp-duration-slow) var(--sp-ease-entry);
+}
+.column.is-partial .column-fill { background: var(--sp-green-light); }
+.column-month { font-size: 0.72rem; color: var(--sp-neutral-secondary); }
+
+/* Balance line */
+.line-chart { position: relative; block-size: 110px; margin-inline-end: 4.5em; }
+.line-svg { display: block; inline-size: 100%; block-size: 100%; overflow: visible; }
+.line-path { fill: none; stroke: var(--chart-series); stroke-width: 2px; stroke-linejoin: round; stroke-linecap: round; }
+.line-area { fill: var(--chart-series); fill-opacity: 0.1; stroke: none; }
+.line-zero { stroke: var(--sp-border-subtle); stroke-width: 1px; vector-effect: non-scaling-stroke; }
+.line-dot {
+  position: absolute;
+  inset-inline-end: -5px;
+  inline-size: 10px;
+  block-size: 10px;
+  margin-block-start: -5px;
+  border-radius: 50%;
+  background: var(--chart-series);
+  box-shadow: 0 0 0 2px var(--sp-white);   /* the surface ring */
+}
+.line-end { position: absolute; inset-inline-start: calc(100% + 10px); transform: translateY(-50%); font-size: 0.8rem; color: var(--sp-neutral-strongest); white-space: nowrap; }
+.line-months { display: flex; justify-content: space-between; margin-inline-end: 4.5em; font-size: 0.72rem; color: var(--sp-neutral-secondary); }
+
+/* Budget: one meter per basket, like the cards above the chat. */
+.meters { display: grid; gap: var(--sp-space-3); }
+.meter { display: grid; grid-template-columns: minmax(0, 1fr) auto; row-gap: 4px; column-gap: var(--sp-space-2); font-size: 0.85rem; }
+.meter-label { color: var(--sp-neutral-stronger); }
+.meter-value { color: var(--sp-neutral-strongest); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.meter-track { grid-column: 1 / -1; block-size: 8px; border-radius: var(--sp-radius-pill); background: var(--sp-green-pale); overflow: hidden; }
+.meter-fill { display: block; block-size: 100%; border-radius: inherit; background: var(--chart-series); transition: inline-size var(--sp-duration-slow) var(--sp-ease-entry); }
+.meter.is-over .meter-fill { background: var(--sp-error-text); }
+
+/* One category against others: median (tick), Finnish average (diamond), you (dot). */
+.ranges { display: grid; gap: var(--sp-space-4); }
+.range { display: grid; gap: 6px; font-size: 0.85rem; }
+.range-label { color: var(--sp-neutral-stronger); }
+.range-track { position: relative; display: block; block-size: 18px; margin-inline: 6px; }
+.range-track::before {   /* the scale's baseline */
+  content: "";
+  position: absolute;
+  inset-inline: 0;
+  inset-block-start: 50%;
+  block-size: 1px;
+  background: var(--sp-border-subtle);
+}
+.range-median { position: absolute; inset-block: 0; inline-size: 2px; margin-inline-start: -1px; border-radius: 1px; background: var(--chart-peer); }
+.range-me {
+  position: absolute;
+  inset-block-start: 50%;
+  inline-size: 12px;
+  block-size: 12px;
+  margin: -6px 0 0 -6px;
+  border-radius: 50%;
+  background: var(--chart-series);
+  box-shadow: 0 0 0 2px var(--sp-white);   /* the surface ring */
+}
+.range-figures { display: flex; justify-content: space-between; gap: var(--sp-space-3); font-size: 0.8rem; color: var(--sp-neutral-secondary); }
+.range-figures span:first-child { color: var(--sp-neutral-strongest); }
+.swatch--dot { inline-size: 10px; block-size: 10px; border-radius: 50%; background: var(--chart-series); }
+.swatch--tick { inline-size: 2px; block-size: 12px; border-radius: 1px; background: var(--chart-peer); }
+
+/* Statistics Finland's average: a small dark diamond, a shape of its own so it
+   never reads as the customer's dot or the peers' median tick. */
+.hbar-track { position: relative; }
+.mark-finland {
+  position: absolute;
+  inset-block-start: 50%;
+  inline-size: 9px;
+  block-size: 9px;
+  margin: -4.5px 0 0 -4.5px;
+  transform: rotate(45deg);
+  border-radius: 1.5px;
+  background: var(--sp-neutral-stronger);
+  box-shadow: 0 0 0 1.5px var(--sp-white);
+}
+.swatch--finland { inline-size: 8px; block-size: 8px; border-radius: 1.5px; transform: rotate(45deg); background: var(--sp-neutral-stronger); }
+.chat-chart-source { font-size: 0.72rem; }

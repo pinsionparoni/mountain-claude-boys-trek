@@ -19,9 +19,12 @@ Full brief: [CHALLENGE.md](CHALLENGE.md)
   3. ☕ Everyday spending / Arjen kulutus (coffees, takeaway, taxis).
 - **A monthly budget and safe to spend this week:** income minus essentials, a reserve for surprises and usual savings gives the everyday budget; the coach tells you what's left this week and checks your account can cover the bills before payday.
 - **"What kind of spender am I?":** compares your spending with people your age (Statistics Finland's age bands) and with everyone, per category and per basket: "you spend less on travel than 85% of people aged 18–24". Only medians and ranks are used, never another customer's data.
+- **Ask, and see it:** in the spirit of MyData, you explore your own data by asking, not through charts the bank picked. When an answer compares numbers ("where did my money go last month?", "has my restaurant spending gone up?", "how does my food spending compare to people my age?"), the coach draws a small chart above its answer: spending by category, a monthly trend, your balance, your budget, or you against people your age and the Finnish average. The AI only chooses the chart; every number in it is computed from your data.
+- **Your month at a glance:** swipeable cards above the chat: safe to spend this week, then each basket this month against what your budget expects for it.
+- **Your receipts, in baskets:** the home screen's receipts show your real latest purchases, each placed in its basket (🏠 🔧 ☕), with unusually large ones flagged.
 - **Computes, doesn't guess:** every number comes from code run on your own transactions; the AI only explains it.
 - **Keeps customer data in Europe:** stored in Frankfurt, processed on our own server in the EU, and answered by Google's open Gemma 4 model on our own Verda server in Finland instead of an outside AI service. One hop isn't in the EU, and we say so: see [Where the data goes](#where-the-data-goes).
-- **Optional benchmarks** from open sources such as Statistics Finland, without ever sending personal data to a search engine.
+- **Open-data benchmarks:** your spending next to **Statistics Finland's** figures for Finnish households your age (household budget survey 2022, per consumption unit, at today's prices), as well as the bank's own customers. The two can tell different stories, and the coach says so: "typical among our customers your age, but 81% above the Finnish average". The figures are stored in the app; nothing about you is sent anywhere.
 
 ## How it works
 
@@ -78,6 +81,7 @@ In short: **the data is stored, processed and handled by the AI model in the EU,
 | **Aiven PostgreSQL** | The S-Pankki synthetic dataset: 5,100 customers, 3.6M transactions |
 | **Modal** | Hosts the demo app and coach API in its EU region; secure sandboxes for calculations *(planned)* |
 | **Claude** | Development and quality baseline |
+| **Statistics Finland** open data | Household spending by age (StatFin tables 14q4, 14q9) and the consumer price index (11xs), CC BY 4.0. Source: Statistics Finland |
 | **Exa** | Optional web search for public benchmarks |
 
 More detail: [TECH_STACK.md](TECH_STACK.md)

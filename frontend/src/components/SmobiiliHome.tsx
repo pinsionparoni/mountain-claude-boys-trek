@@ -1,25 +1,29 @@
 // S-mobiili's logged-in home screen, laid out like the real app. The only change is
 // that the chat bubble (top right) leads to the Message centre, where the financial
-// coach lives. Balances come from the demo customer's synthetic data; the Bonus and
-// receipt figures are made-up demo values.
-import { formatDay, type Lang, type Text } from "../lib/i18n";
-import type { Budget } from "../lib/types";
+// coach lives. The balance and the latest receipt come from the demo customer's
+// synthetic data; the Bonus figures are made-up demo values.
+import type { Lang, Text } from "../lib/i18n";
+import type { BasketSummary, Budget, Receipt } from "../lib/types";
 import { formatMoney } from "../lib/money";
 import sTiliUrl from "../assets/smobiili/s-tili.png";
 import visaUrl from "../assets/smobiili/visa-debit.png";
 import { BagIcon, BookmarkIcon, ChatDotIcon, ChevronIcon, InfoIcon, LogoutIcon, MailIcon, PlusIcon, ReceiptIcon } from "./Icons";
 import { ListRow } from "./ListRow";
+import { ReceiptRow } from "./ReceiptsPage";
 import { SLogo } from "./SLogo";
 
 interface Props {
   t: Text;
   lang: Lang;
   budget: Budget | null;
+  summary: BasketSummary | null;
+  latestReceipt: Receipt | null;
+  onOpenReceipts: () => void;
   onOpenMessages: () => void;
   onLogout: () => void;
 }
 
-export function SmobiiliHome({ t, lang, budget, onOpenMessages, onLogout }: Props) {
+export function SmobiiliHome({ t, lang, budget, summary, latestReceipt, onOpenReceipts, onOpenMessages, onLogout }: Props) {
   const h = t.home;
   return (
     <>
@@ -72,11 +76,14 @@ export function SmobiiliHome({ t, lang, budget, onOpenMessages, onLogout }: Prop
 
         <div className="sm-heading-row">
           <h2 className="sm-heading">{h.receipts}</h2>
-          <span className="sm-link">{h.open}</span>
+          <button type="button" className="sm-link" onClick={onOpenReceipts}>{h.open}</button>
         </div>
         <div className="sm-card sm-list">
-          <ListRow icon={<ReceiptIcon />} title="S-market" subtitle={budget ? `08:12 ${formatDay(budget.today, lang)}` : undefined}
-                   end={<span className="sm-receipt-amount money">{formatMoney(23.45)}</span>} hint={h.notInDemo} />
+          {latestReceipt
+            ? <button type="button" className="sm-receipt-button" onClick={onOpenReceipts}>
+                <ReceiptRow receipt={latestReceipt} summary={summary} lang={lang} t={t} />
+              </button>
+            : <ListRow icon={<ReceiptIcon />} title={h.receipts} subtitle={t.loading} end={<span />} />}
         </div>
       </div>
     </>

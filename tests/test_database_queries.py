@@ -367,3 +367,36 @@ def test_population_rejects_reversed_dates(fake_db, fresh_population_cache):
     with pytest.raises(ValueError):
         queries.population_spending(END, START)
     assert fake_db.cursors == []
+
+
+# --- Receipts --------------------------------------------------------------
+
+def test_recent_purchases_are_card_purchases_up_to_today_newest_first(fake_db):
+    from datetime import datetime
+    fake_db.queue([
+        {"tx_timestamp": datetime(2026, 9, 9, 10, 58, 42), "category": "Groceries",
+         "mcc_code": "5411", "amount_eur": Decimal("63.41")},
+        {"tx_timestamp": datetime(2026, 9, 8, 12, 0, 0), "category": "Health",
+         "mcc_code": "5912", "amount_eur": Decimal("900.00")},
+        {"tx_timestamp": datetime(2026, 9, 7, 9, 0, 0), "category": "Restaurants",
+         "mcc_code": None, "amount_eur": Decimal("12.50")},
+    ])
+
+    rows = queries.recent_purchases("CUST1", date(2026, 9, 10), 3)
+
+    query, params = fake_db.cursors[0].calls[0]
+    assert params == ("CUST1", date(2026, 9, 10), 3)
+    assert "transaction_type = 'purchase'" in query
+    assert "ORDER BY tx_timestamp DESC" in query
+    assert rows[0] == {"timestamp": "2026-09-09T10:58:42", "category": "Groceries",
+                       "merchant_type": "supermarket", "basket": "regular_essentials",
+                       "amount_eur": 63.41, "unusual": False}
+    # A pharmacy purchase of 900 EUR is a large one-off: an unexpected necessity.
+    assert rows[1]["basket"] == "unexpected_necessities" and rows[1]["unusual"] is True
+    assert rows[2]["merchant_type"] == "other" and rows[2]["basket"] == "everyday_spending"
+
+
+@pytest.mark.parametrize("limit", [0, 101])
+def test_recent_purchases_validates_limit(fake_db, limit):
+    with pytest.raises(ValueError):
+        queries.recent_purchases("CUST1", END, limit)

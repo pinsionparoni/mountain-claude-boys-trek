@@ -1,5 +1,5 @@
 // Calls to the FastAPI backend. In development Vite forwards /api to it (vite.config.ts).
-import type { BasketSummary, Budget } from "./types";
+import type { BasketSummary, Budget, ChartSpec, Receipts } from "./types";
 
 const BASE = "/api";
 
@@ -47,10 +47,14 @@ export const fetchSummary = (customerId: string) =>
 export const fetchBudget = (customerId: string) =>
   getJson<Budget>(`/customers/${encodeURIComponent(customerId)}/budget`);
 
+export const fetchReceipts = (customerId: string) =>
+  getJson<Receipts>(`/customers/${encodeURIComponent(customerId)}/receipts?limit=40`);
+
 export interface ChatHandlers {
   onConversation: (conversationId: string) => void;
   onTool: (name: string) => void;
   onText: (text: string) => void;
+  onChart?: (chart: ChartSpec) => void;
   onError: (message: string) => void;
 }
 
@@ -88,6 +92,7 @@ export async function streamChat(
       if (event === "conversation") handlers.onConversation(data.conversation_id);
       else if (event === "tool") handlers.onTool(data.name);
       else if (event === "text") handlers.onText(data.text);
+      else if (event === "chart") handlers.onChart?.(data);
       else if (event === "error") handlers.onError(data.message);
       else if (event === "done") return;
     }

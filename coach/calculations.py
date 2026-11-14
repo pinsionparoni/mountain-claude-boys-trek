@@ -558,3 +558,14 @@ def compare_with_peers(
             "below_peers": standouts("below_peers", "spends_less_than_pct_of_peers"),
         },
     }
+
+
+def difference_pct(value: Number, reference: Number) -> float | None:
+    """How much ``value`` is above (+) or below (-) ``reference``, in whole percent.
+
+    None when there is no reference to compare with (0 or missing).
+    """
+    ref = _d("reference", reference)
+    if ref <= 0:
+        return None
+    return float(((_d("value", value) - ref) * 100 / ref).quantize(Decimal("1"), rounding=ROUND_HALF_UP))

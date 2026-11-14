@@ -16,7 +16,8 @@ interface Props {
   /** The hosted demo asks for a passcode; locally there is none. */
   passcodeRequired: boolean;
   passcodeError: boolean;
-  onLogin: (passcode: string) => void;
+  /** May be async (checking the passcode): the button shows "Logging in…" meanwhile. */
+  onLogin: (passcode: string) => void | Promise<void>;
 }
 
 const reducedMotion = () => window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
@@ -24,6 +25,12 @@ const reducedMotion = () => window.matchMedia?.("(prefers-reduced-motion: reduce
 export function LoginScreen({ t, lang, customerId, onLang, onCustomer, passcodeRequired, passcodeError, onLogin }: Props) {
   const [ready, setReady] = useState(reducedMotion);
   const [code, setCode] = useState(savedPasscode);
+  const [busy, setBusy] = useState(false);
+
+  const submit = async () => {
+    setBusy(true);
+    try { await onLogin(code.trim()); } finally { setBusy(false); }
+  };
 
   return (
     <div className="sm-login">
@@ -35,7 +42,7 @@ export function LoginScreen({ t, lang, customerId, onLang, onCustomer, passcodeR
       </div>
 
       <form className={`sm-login-form${ready ? " is-visible" : ""}`} aria-hidden={!ready}
-            onSubmit={(e) => { e.preventDefault(); onLogin(code.trim()); }}>
+            onSubmit={(e) => { e.preventDefault(); if (!busy) void submit(); }}>
         <h1 className="sm-login-title">{t.home.loginTitle}</h1>
         <p className="sm-login-lead">{t.home.loginLead}</p>
 
@@ -65,7 +72,9 @@ export function LoginScreen({ t, lang, customerId, onLang, onCustomer, passcodeR
         )}
         {passcodeError && <p id="passcode-error" className="sm-login-error" role="alert">{t.passcodeWrong}</p>}
 
-        <button type="submit" className="sm-login-button" tabIndex={ready ? 0 : -1}>{t.home.loginButton}</button>
+        <button type="submit" className="sm-login-button" tabIndex={ready ? 0 : -1} disabled={busy} aria-busy={busy}>
+          {busy ? t.home.loggingIn : t.home.loginButton}
+        </button>
         <p className="sm-login-badge">{t.demoBadge}</p>
       </form>
     </div>

@@ -11,7 +11,10 @@ from coach.spending_baskets import (
     UNCLASSIFIED,
     UNCLASSIFIED_FINANCIAL_FLOW_NOTES,
     basket_lookup,
+    classify_purchase,
+    is_large_purchase,
     large_purchase_thresholds,
+    merchant_type,
     salary_sweep_info,
     summarize_baskets,
 )
@@ -249,6 +252,60 @@ def basket_summary(
         "end_date": end_date.isoformat(),
     }
     return summary
+
+
+def recent_purchases(
+    customer_id: str,
+    until: date,
+    limit: int = 30,
+) -> list[dict]:
+    """
+    Return a customer's latest card purchases up to ``until``, newest first:
+    the "receipts" in the app.
+
+    Only ``purchase`` transactions (shops, restaurants, travel...), not rent
+    or utility bills. Each row has ``timestamp`` (ISO), ``category``,
+    ``merchant_type`` (as in spending_baskets.MERCHANT_TYPES, "other" when
+    unknown), ``basket`` (by the same rules as basket_summary),
+    ``amount_eur`` (money out, positive) and ``unusual`` (a large one-off
+    purchase). ``limit`` is 1 to 100.
+    """
+    if not customer_id:
+        raise ValueError("customer_id is required")
+    if not 1 <= limit <= 100:
+        raise ValueError("limit must be between 1 and 100")
+
+    query = """
+        SELECT
+            tx_timestamp,
+            COALESCE(category, 'Uncategorized') AS category,
+            mcc_code,
+            -tx_amount_eur AS amount_eur
+        FROM transactions
+        WHERE customer_id = %s
+          AND tx_date <= %s
+          AND transaction_type = 'purchase'
+          AND tx_amount_eur < 0
+        ORDER BY tx_timestamp DESC, id DESC
+        LIMIT %s;
+    """
+
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(query, (customer_id, until, limit))
+            rows = cur.fetchall()
+
+    return [
+        {
+            "timestamp": row["tx_timestamp"].isoformat(),
+            "category": row["category"],
+            "merchant_type": merchant_type(row["mcc_code"], row["category"]),
+            "basket": classify_purchase(row["category"], row["mcc_code"], row["amount_eur"]),
+            "amount_eur": round(float(row["amount_eur"]), 2),
+            "unusual": is_large_purchase(row["category"], row["amount_eur"]),
+        }
+        for row in rows
+    ]
 
 
 def monthly_balance_trend(

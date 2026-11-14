@@ -1,13 +1,15 @@
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { streamChat } from "../lib/api";
 import { formatAnswer } from "../lib/formatAnswer";
-import type { Text } from "../lib/i18n";
-import type { ChatMessage } from "../lib/types";
+import type { Lang, Text } from "../lib/i18n";
+import type { ChartSpec, ChatMessage } from "../lib/types";
+import { ChatChart } from "./ChatChart";
 import { SendIcon } from "./Icons";
 
 interface Props {
   customerId: string;
   t: Text;
+  lang: Lang;
   showSuggestions: boolean;
   children?: ReactNode;  // cards shown above the conversation
 }
@@ -16,7 +18,7 @@ interface Props {
 // input bar pinned to the bottom, like S-mobiili's tab bar. The composer, history and
 // status live outside ui.config: they are core behaviour.
 // Parent renders it with key={customerId}, so a new customer starts a new conversation.
-export function Chat({ customerId, t, showSuggestions, children }: Props) {
+export function Chat({ customerId, t, lang, showSuggestions, children }: Props) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [draft, setDraft] = useState("");
   const [status, setStatus] = useState("");
@@ -33,6 +35,8 @@ export function Chat({ customerId, t, showSuggestions, children }: Props) {
 
   const appendToAnswer = (id: string, text: string) =>
     setMessages((all) => all.map((m) => (m.id === id ? { ...m, text: m.text + text } : m)));
+  const addChart = (id: string, chart: ChartSpec) =>
+    setMessages((all) => all.map((m) => (m.id === id ? { ...m, charts: [...(m.charts ?? []), chart] } : m)));
 
   const send = async (text: string) => {
     const question = text.trim();
@@ -53,6 +57,7 @@ export function Chat({ customerId, t, showSuggestions, children }: Props) {
         onConversation: (id) => { conversationId.current = id; },
         onTool: (name) => setStatus(t.tools[name] ?? t.checking),
         onText: (chunk) => { setStatus(""); appendToAnswer(answerId, chunk); },
+        onChart: (chart) => addChart(answerId, chart),
         onError: (message) => appendToAnswer(answerId, `\n\n${message}`),
       });
     } catch {
@@ -78,11 +83,17 @@ export function Chat({ customerId, t, showSuggestions, children }: Props) {
         <section className="chat" aria-label={t.chatTitle}>
           <ol className="chat-log" aria-label={t.conversation}>
             {shown
-              .filter((m) => m.text)
+              .filter((m) => m.text || m.charts?.length)
               .map((m) => (
                 <li key={m.id} className={`chat-message chat-message--${m.author}`}>
                   <span className="visually-hidden">{m.author === "user" ? t.you : t.coach}</span>
-                  {m.author === "assistant" ? <div className="answer">{formatAnswer(m.text)}</div> : m.text}
+                  {m.author === "assistant"
+                    ? <>
+                        {/* The chart first: it gives the picture before the words explain it. */}
+                        {m.charts?.map((chart, i) => <ChatChart key={i} chart={chart} t={t} lang={lang} />)}
+                        {m.text && <div className="answer">{formatAnswer(m.text)}</div>}
+                      </>
+                    : m.text}
                 </li>
               ))}
             {status && (

@@ -9,6 +9,7 @@ export interface Basket {
   total_eur: number;
   share_pct: number;
   transaction_count: number;
+  categories: { category: string; total_eur: number }[];  // largest first
 }
 
 export interface BasketSummary {
@@ -48,8 +49,55 @@ export interface Budget {
   limited_by: "budget" | "cash";
 }
 
+/** One card purchase from GET /customers/{id}/receipts (coach/database/queries.py recent_purchases). */
+export interface Receipt {
+  timestamp: string;       // ISO, local time of the purchase
+  category: string;        // the data's category, e.g. "Groceries"
+  merchant_type: string;   // spending_baskets.MERCHANT_TYPES label, or "other"
+  basket: BasketKey | "unclassified";
+  amount_eur: number;      // money out, positive
+  unusual: boolean;        // a large one-off purchase
+}
+
+export interface Receipts {
+  today: string;
+  receipts: Receipt[];
+}
+
+/** A chart the coach chose to show (coach/charts.py); every number computed by the backend. */
+export type ChartSpec =
+  | { type: "categories"; period: { start_date: string; end_date: string };
+      items: { category: string; value: number }[]; total: number }
+  | { type: "trend"; subject: { category: string | null; basket: BasketKey | null };
+      months: { month: string; value: number; partial: boolean }[]; today: string }
+  | { type: "balance"; points: { month: string; value: number }[]; today: string }
+  | { type: "budget"; today: string; baskets: { basket: BasketKey; spent: number; reference: number }[] }
+  | { type: "peers"; age_group: string; period: { start_date: string; end_date: string };
+      items: { category: string; me: number; peer_median: number; finland: number | null }[]; left_out: string[];
+      finland_source: FinlandSource | null }
+  | { type: "peer_range"; category: string; age_group: string; period: { start_date: string; end_date: string };
+      me: number; age: PeerGroup; everyone: PeerGroup;
+      finland: { age: number; all: number } | null; finland_source: FinlandSource | null };
+
+/** Statistics Finland's open benchmark (coach/statfin.py). */
+export interface FinlandSource {
+  publisher: string;
+  licence: string;
+  survey_year: number;
+  price_level: string;
+}
+
+export interface PeerGroup {
+  median: number;
+  typical_low: number;    // 25th percentile
+  typical_high: number;   // 75th percentile
+  spends_more_than_pct: number;
+  spends_less_than_pct: number;
+}
+
 export interface ChatMessage {
   id: string;
   author: "user" | "assistant";
   text: string;
+  charts?: ChartSpec[];
 }
