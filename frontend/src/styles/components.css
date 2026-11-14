@@ -1044,3 +1044,29 @@ html, body, #root { block-size: 100%; overflow: hidden; }
 }
 .swatch--finland { inline-size: 8px; block-size: 8px; border-radius: 1.5px; transform: rotate(45deg); background: var(--sp-neutral-stronger); }
 .chat-chart-source { font-size: 0.72rem; }
+
+/* Home: "Talousneuvoja", one money-coaching tip with a chart and "Kysy lisää". */
+.sm-tip { justify-items: stretch; gap: var(--sp-space-3); text-align: start; }
+.sm-tip-title { display: flex; gap: var(--sp-space-2); align-items: baseline; font-size: 1.05rem; font-weight: var(--sp-weight-semibold); color: var(--sp-green-strong); }
+.sm-tip-body { color: var(--sp-neutral-strongest); font-size: 0.95rem; line-height: 1.45; }
+.sm-tip .chat-chart { padding-block-start: var(--sp-space-3); border-block-start: 1px solid var(--sp-border-subtle); }
+.sm-tip .chat-chart-title { color: var(--sp-neutral-stronger); font-size: 0.85rem; }
+.sm-tip-button {
+  justify-self: start;
+  min-block-size: 44px;
+  padding-inline: var(--sp-space-5);
+  border: 0;
+  border-radius: var(--sp-radius-pill);
+  background: var(--sp-green-strong);
+  color: var(--sp-white);
+  font: inherit;
+  font-weight: var(--sp-weight-semibold);
+  cursor: pointer;
+  transition: background-color var(--sp-duration-fast) var(--sp-ease-default), transform var(--sp-duration-faster) var(--sp-ease-default);
+}
+.sm-tip-button:hover { background: var(--sp-green-strongest); }
+.sm-tip-button:active { transform: scale(0.98); }
+.sm-tip-button:focus-visible { outline: var(--sp-focus-width) solid var(--sp-focus-color); outline-offset: var(--sp-focus-offset); }
+
+/* The load error offers "Try again" instead of leaving the screen empty. */
+.load-error { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--sp-space-2) var(--sp-space-4); }

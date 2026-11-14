@@ -1,5 +1,5 @@
 // Calls to the FastAPI backend. In development Vite forwards /api to it (vite.config.ts).
-import type { BasketSummary, Budget, ChartSpec, Receipts } from "./types";
+import type { BasketSummary, Budget, ChartSpec, Receipts, Tip } from "./types";
 
 const BASE = "/api";
 
@@ -30,6 +30,22 @@ async function getJson<T>(path: string): Promise<T> {
   return response.json() as Promise<T>;
 }
 
+/**
+ * Run a request again after short pauses if it fails (a brief network drop, a server
+ * waking up), so one blip doesn't leave the screen empty. A wrong passcode is never
+ * retried: asking again wouldn't help.
+ */
+export async function withRetry<T>(request: () => Promise<T>, pausesMs = [1000, 2000, 4000]): Promise<T> {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await request();
+    } catch (e) {
+      if (e instanceof PasscodeError || attempt >= pausesMs.length) throw e;
+      await new Promise((resolve) => setTimeout(resolve, pausesMs[attempt]));
+    }
+  }
+}
+
 export const fetchHealth = () =>
   getJson<{ ok: boolean; model: string; passcode_required: boolean }>("/health");
 
@@ -46,6 +62,9 @@ export const fetchSummary = (customerId: string) =>
 
 export const fetchBudget = (customerId: string) =>
   getJson<Budget>(`/customers/${encodeURIComponent(customerId)}/budget`);
+
+export const fetchTip = (customerId: string) =>
+  getJson<Tip>(`/customers/${encodeURIComponent(customerId)}/tip`);
 
 export const fetchReceipts = (customerId: string) =>
   getJson<Receipts>(`/customers/${encodeURIComponent(customerId)}/receipts?limit=40`);

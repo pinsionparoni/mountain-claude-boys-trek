@@ -74,3 +74,13 @@ def test_receipts_are_protected_and_stop_at_today(monkeypatch):
     assert asked == [("CUST00226", date(2026, 9, 10), 5)]
     bad = CLIENT.get("/customers/CUST00226/receipts?limit=500", headers={"X-Demo-Passcode": "junction-2026"})
     assert bad.status_code == 400
+
+
+def test_tip_is_protected(monkeypatch):
+    from datetime import date
+    monkeypatch.setattr(api, "_today", lambda customer_id: date(2026, 9, 10))
+    monkeypatch.setattr(api.tips, "pick", lambda c, t: {"kind": "on_track", "facts": {}, "chart": {}})
+    monkeypatch.setenv("DEMO_PASSCODE", "junction-2026")
+    assert CLIENT.get("/customers/CUST00226/tip").status_code == 401
+    ok = CLIENT.get("/customers/CUST00226/tip", headers={"X-Demo-Passcode": "junction-2026"})
+    assert ok.json() == {"today": "2026-09-10", "kind": "on_track", "facts": {}, "chart": {}}

@@ -14,9 +14,9 @@ import { ReceiptsPage } from "./components/ReceiptsPage";
 import { SafeToSpendCard } from "./components/SafeToSpendCard";
 import { SmobiiliHome } from "./components/SmobiiliHome";
 import { demoCustomers } from "./fixtures/demo";
-import { PasscodeError, checkPasscode, fetchBudget, fetchHealth, fetchReceipts, fetchSummary, rememberPasscode } from "./lib/api";
+import { PasscodeError, checkPasscode, fetchBudget, fetchHealth, fetchReceipts, fetchSummary, fetchTip, rememberPasscode, withRetry } from "./lib/api";
 import { formatDay, text, type Lang } from "./lib/i18n";
-import type { BasketKey, BasketSummary, Budget, Receipts } from "./lib/types";
+import type { BasketKey, BasketSummary, Budget, Receipts, Tip } from "./lib/types";
 
 const BASKETS: BasketKey[] = ["regular_essentials", "unexpected_necessities", "everyday_spending"];
 
@@ -52,7 +52,13 @@ export default function App() {
   const [summary, setSummary] = useState<BasketSummary | null>(null);
   const [budget, setBudget] = useState<Budget | null>(null);
   const [receipts, setReceipts] = useState<Receipts | null>(null);
+  const [tip, setTip] = useState<Tip | null>(null);
+  // A question for the coach from the home screen's tip ("Kysy lisää").
+  const [pendingQuestion, setPendingQuestion] = useState<string | null>(null);
+  // Where the coach's back arrow leads: the message centre, or home when opened from the tip.
+  const [coachBack, setCoachBack] = useState<null | "messages">("messages");
   const [error, setError] = useState(false);
+  const [reloads, setReloads] = useState(0);   // "Try again" after a failed load
   // The hosted demo needs a passcode before any data loads (null: still asking the backend).
   const [passcodeRequired, setPasscodeRequired] = useState<boolean | null>(null);
   const [passcodeError, setPasscodeError] = useState(false);
@@ -74,6 +80,8 @@ export default function App() {
     setSummary(null);
     setBudget(null);
     setReceipts(null);
+    setTip(null);
+    setPendingQuestion(null);
     setError(false);
   };
 
@@ -94,21 +102,25 @@ export default function App() {
   useEffect(() => {
     if (!canLoad) return;
     let current = true;
-    Promise.all([fetchSummary(customerId), fetchBudget(customerId)])
+    // Retried a few times, so a short network drop doesn't leave the cards empty.
+    withRetry(() => Promise.all([fetchSummary(customerId), fetchBudget(customerId)]))
       .then(([s, b]) => {
-        if (current) { setSummary(s); setBudget(b); }
+        if (current) { setSummary(s); setBudget(b); setError(false); }
       })
       .catch((e) => {
         if (!current) return;
         if (e instanceof PasscodeError) { setPasscodeError(true); setLoggedIn(false); }
         else setError(true);
       });
-    // Receipts load on their own, so a problem there never hides the cards.
-    fetchReceipts(customerId)
+    // Receipts and the tip load on their own, so a problem there never hides the cards.
+    withRetry(() => fetchReceipts(customerId))
       .then((r) => current && setReceipts(r))
       .catch(() => current && setReceipts({ today: "", receipts: [] }));
+    withRetry(() => fetchTip(customerId))
+      .then((tp) => current && setTip(tp))
+      .catch(() => { /* no tip then: the card keeps its loading text */ });
     return () => { current = false; };
-  }, [customerId, canLoad]);
+  }, [customerId, canLoad, reloads]);
 
   return (
     <div className="sp-coach app" data-card-style={uiConfig.cardStyle}>
@@ -121,12 +133,21 @@ export default function App() {
                          onLogin={login} />
           ) : (
             <>
-              {error && <p className="notice notice--error" role="alert">{t.loadError}</p>}
+              {error && (
+                <p className="notice notice--error load-error" role="alert">
+                  <span>{t.loadError}</span>
+                  <button type="button" className="sm-link" onClick={() => { setError(false); setReloads((n) => n + 1); }}>
+                    {t.tryAgain}
+                  </button>
+                </p>
+              )}
 
               <div className="sm-screen" hidden={overlay !== null}>
                 <main className="sm-scroll">
                   {tab === "home" && <SmobiiliHome t={t} lang={lang} budget={budget} summary={summary}
                                                    latestReceipt={receipts?.receipts[0] ?? null}
+                                                   tip={tip}
+                                                   onAsk={(q) => { setPendingQuestion(q); setCoachBack(null); setOverlay("coach"); }}
                                                    onOpenReceipts={() => setOverlay("receipts")}
                                                    onOpenMessages={openMessages} onLogout={logout} />}
                   {tab === "card" && <EtukorttiPage t={t} />}
@@ -143,20 +164,22 @@ export default function App() {
               </div>
 
               <div className="sm-screen" hidden={overlay !== "messages"}>
-                <MessageCentre t={t} onBack={() => setOverlay(null)} onOpenCoach={() => setOverlay("coach")} />
+                <MessageCentre t={t} onBack={() => setOverlay(null)} onOpenCoach={() => { setCoachBack("messages"); setOverlay("coach"); }} />
               </div>
 
               {/* Kept mounted while hidden so the conversation survives a trip back. */}
               <div className="sm-screen" hidden={overlay !== "coach"}>
                 <header className="sm-header">
                   <button type="button" className="sm-icon-button" aria-label={t.home.back}
-                          onClick={() => setOverlay("messages")}>
+                          onClick={() => setOverlay(coachBack)}>
                     <BackIcon />
                   </button>
                   <h1 className="sm-header-title">{t.appName}</h1>
                   <span />
                 </header>
-                <Chat key={customerId} customerId={customerId} t={t} lang={lang} showSuggestions={uiConfig.showSuggestionChips}>
+                <Chat key={customerId} customerId={customerId} t={t} lang={lang}
+                      pendingQuestion={pendingQuestion} onPendingSent={() => setPendingQuestion(null)}
+                      showSuggestions={uiConfig.showSuggestionChips}>
                   {!error && !budget && <p className="panel muted">{t.loading}</p>}
                   <CardCarousel t={t}>
                     {budget && <SafeToSpendCard budget={budget} t={t} lang={lang} />}

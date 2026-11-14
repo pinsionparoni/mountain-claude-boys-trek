@@ -3,11 +3,12 @@
 // coach lives. The balance and the latest receipt come from the demo customer's
 // synthetic data; the Bonus figures are made-up demo values.
 import type { Lang, Text } from "../lib/i18n";
-import type { BasketSummary, Budget, Receipt } from "../lib/types";
+import type { BasketSummary, Budget, Receipt, Tip } from "../lib/types";
 import { formatMoney } from "../lib/money";
 import sTiliUrl from "../assets/smobiili/s-tili.png";
 import visaUrl from "../assets/smobiili/visa-debit.png";
 import { BagIcon, BookmarkIcon, ChatDotIcon, ChevronIcon, InfoIcon, LogoutIcon, MailIcon, PlusIcon, ReceiptIcon } from "./Icons";
+import { HomeTip } from "./HomeTip";
 import { ListRow } from "./ListRow";
 import { ReceiptRow } from "./ReceiptsPage";
 import { SLogo } from "./SLogo";
@@ -18,12 +19,14 @@ interface Props {
   budget: Budget | null;
   summary: BasketSummary | null;
   latestReceipt: Receipt | null;
+  tip: Tip | null;
+  onAsk: (question: string) => void;   // opens the coach and asks this
   onOpenReceipts: () => void;
   onOpenMessages: () => void;
   onLogout: () => void;
 }
 
-export function SmobiiliHome({ t, lang, budget, summary, latestReceipt, onOpenReceipts, onOpenMessages, onLogout }: Props) {
+export function SmobiiliHome({ t, lang, budget, summary, latestReceipt, tip, onAsk, onOpenReceipts, onOpenMessages, onLogout }: Props) {
   const h = t.home;
   return (
     <>
@@ -73,6 +76,9 @@ export function SmobiiliHome({ t, lang, budget, summary, latestReceipt, onOpenRe
                    subtitle={h.cardRowSub} end={<span />} hint={h.notInDemo} />
           <span className="sm-list-footer">{h.hide}</span>
         </div>
+
+        <h2 className="sm-heading">{h.coachingTitle}</h2>
+        <HomeTip t={t} lang={lang} tip={tip} onAsk={onAsk} />
 
         <div className="sm-heading-row">
           <h2 className="sm-heading">{h.receipts}</h2>
