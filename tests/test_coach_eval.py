@@ -23,6 +23,8 @@ CASES = json.loads((Path(__file__).parent.parent / "evals" / "coach" / "cases.js
     ("2 541,89", "a total of 2,541.89 €"),
     ("1,086.14", "yhteensä 1 086,14 €"),
     ("203,1", "noin 203,10 € viikossa"),
+    ("-41,80", "Your account balance right now is -41.8 €."),
+    ("-41,80", "Saldosi on −41,80 €."),
 ])
 def test_numbers_are_found_in_either_format(number, text):
     assert _number_pattern(number).search(text)
@@ -111,3 +113,11 @@ def test_expected_numbers_are_found_in_both_formats(c):
 def test_wilson_range():
     assert wilson(28, 31) == [75, 97]
     assert wilson(0, 0) is None
+
+
+def test_an_expected_zero_can_be_said_in_words():
+    must = {"group": "correct", "lang": "en", "must": {"tools_any": ["get_safe_to_spend"], "numbers": ["0,00"]}}
+    r = score(must, "Right now, you don't have any room to spend for the rest of the week.", ["get_safe_to_spend"])
+    assert r["checks"]["number 0,00"]
+    r = score(must, "You can spend 25 € this week.", ["get_safe_to_spend"])
+    assert not r["checks"]["number 0,00"]

@@ -59,7 +59,14 @@ def _number_pattern(number):
     if decimals is None:
         return re.compile(rf"(?<![\d,.]){whole_re}(?![\d])")
     rounded = round(float(f"{whole}.{decimals}"))
-    return re.compile(rf"(?<![\d,.])(?:{whole_re}[,.]{decimals}(?:0)?(?!\d)|{rounded}(?![\d,.]\d))")
+    # A trailing zero may be dropped: 41,80 is also written 41,8.
+    dec_re = decimals[0] + "0?" if len(decimals) == 2 and decimals.endswith("0") else decimals + "(?:0)?"
+    return re.compile(rf"(?<![\d,.])(?:{whole_re}[,.]{dec_re}(?!\d)|{rounded}(?![\d,.]\d))")
+
+
+# "Nothing left" is a correct way to say an expected 0 €.
+ZERO_WORDS = re.compile(
+    r"\b(nothing|not any|no room|no money|zero|(?:don.t|do not) have any|ei mitään|ei yhtään|ei lainkaan|nolla|ei ole varaa)", re.I)
 
 
 def score(case, answer, tools, guardrail=None):
@@ -76,6 +83,8 @@ def score(case, answer, tools, guardrail=None):
             notes.append(f"expected one of {must['tools_any']}, called {tools or 'none'}")
     for number in must.get("numbers", []):
         ok = bool(_number_pattern(number).search(text))
+        if not ok and float(number.replace(" ", "").replace(",", ".")) == 0:
+            ok = bool(ZERO_WORDS.search(text))
         checks[f"number {number}"] = ok
         if not ok:
             notes.append(f"missing number {number}")

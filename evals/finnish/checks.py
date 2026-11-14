@@ -58,7 +58,7 @@ ALLOWED_CAPITAL_PREFIXES = (
     "Helsin", "Hel", "Espoo", "Vanta", "Suom", "Euroop", "Tilastokesk", "Kela",
     "Verda", "Gemma", "Claude", "Google", "MyData", "PSD2",
     # Help services named in POLICY.md and organisations the coach may refer to.
-    "Peluur", "Kriisipuhel", "Takuusäät", "Velkalinj", "Verohallin", "Finanssivalvon",
+    "Peluur", "Kriisipuhel", "Takuusäät", "Velkalinj", "Verohallin", "Finanssivalvon", "Vero.fi", "Alko",
 )
 
 # The first words of S-Bank's Finnish basket names. Written exactly as the
