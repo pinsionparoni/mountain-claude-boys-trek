@@ -12,7 +12,7 @@ import { PankkiPage } from "./components/PankkiPage";
 import { SafeToSpendCard } from "./components/SafeToSpendCard";
 import { SmobiiliHome } from "./components/SmobiiliHome";
 import { demoCustomers } from "./fixtures/demo";
-import { fetchBudget, fetchSummary } from "./lib/api";
+import { PasscodeError, checkPasscode, fetchBudget, fetchHealth, fetchSummary, rememberPasscode } from "./lib/api";
 import { formatDay, text, type Lang } from "./lib/i18n";
 import type { BasketSummary, Budget } from "./lib/types";
 
@@ -41,7 +41,16 @@ export default function App() {
   const [summary, setSummary] = useState<BasketSummary | null>(null);
   const [budget, setBudget] = useState<Budget | null>(null);
   const [error, setError] = useState(false);
+  // The hosted demo needs a passcode before any data loads (null: still asking the backend).
+  const [passcodeRequired, setPasscodeRequired] = useState<boolean | null>(null);
+  const [passcodeError, setPasscodeError] = useState(false);
   const t = text[lang];
+
+  useEffect(() => {
+    fetchHealth()
+      .then((h) => setPasscodeRequired(h.passcode_required))
+      .catch(() => setPasscodeRequired(false));  // the data calls will show the error
+  }, []);
 
   useEffect(() => {
     document.documentElement.lang = lang;
@@ -55,19 +64,34 @@ export default function App() {
     setError(false);
   };
 
-  const login = () => { setTab("home"); setOverlay(null); setLoggedIn(true); };
+  const login = async (passcode: string) => {
+    if (passcodeRequired) {
+      const ok = await checkPasscode(passcode).catch(() => false);
+      if (!ok) { setPasscodeError(true); return; }
+      rememberPasscode(passcode);
+    }
+    setPasscodeError(false);
+    setTab("home"); setOverlay(null); setLoggedIn(true);
+  };
   const logout = () => { setOverlay(null); setLoggedIn(false); };
   const openMessages = () => setOverlay("messages");
 
+  // Without a passcode the figures load straight away, as before; with one, after log-in.
+  const canLoad = passcodeRequired === false || loggedIn;
   useEffect(() => {
+    if (!canLoad) return;
     let current = true;
     Promise.all([fetchSummary(customerId), fetchBudget(customerId)])
       .then(([s, b]) => {
         if (current) { setSummary(s); setBudget(b); }
       })
-      .catch(() => current && setError(true));
+      .catch((e) => {
+        if (!current) return;
+        if (e instanceof PasscodeError) { setPasscodeError(true); setLoggedIn(false); }
+        else setError(true);
+      });
     return () => { current = false; };
-  }, [customerId]);
+  }, [customerId, canLoad]);
 
   return (
     <div className="sp-coach app" data-card-style={uiConfig.cardStyle}>
@@ -75,7 +99,9 @@ export default function App() {
         <div className="phone-screen">
           {!loggedIn ? (
             <LoginScreen t={t} lang={lang} customerId={customerId}
-                         onLang={setLang} onCustomer={pickCustomer} onLogin={login} />
+                         onLang={setLang} onCustomer={pickCustomer}
+                         passcodeRequired={passcodeRequired === true} passcodeError={passcodeError}
+                         onLogin={login} />
           ) : (
             <>
               {error && <p className="notice notice--error" role="alert">{t.loadError}</p>}

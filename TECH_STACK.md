@@ -31,7 +31,7 @@ An AI money coach that keeps customer data in Europe on open models, and **compu
 flowchart LR
     U["Customer<br/>mobile web app"] --> API["Coach backend<br/>coach/agent.py"]
 
-    subgraph EU["Verda (EU data centres)"]
+    subgraph EU["Verda (EU, Finland)"]
         G["Gemma 4<br/>vLLM container"]
         N["Nemotron VL<br/>receipt reading"]
     end
@@ -110,8 +110,7 @@ Source: [hackjunction/Junction-2026-S-pankki](https://github.com/hackjunction/Ju
 ### Calculations: Modal Sandboxes
 
 - The coach writes short Python for what-if and safe-to-spend maths; it runs in an isolated Modal Sandbox and returns exact numbers.
-- Modal can also host the backend at a public URL for the demo if we don't host it on Verda.
-- ⚠️ Modal's data region is not checked; send only aggregated numbers, not raw transactions.
+- Modal also hosts the demo backend and app (see [SETUP.md § 12](SETUP.md#12-hosted-demo-on-modal) and "Where the data goes" below), pinned to Modal's EU region.
 
 ### Receipts: Nemotron 3.5 Super VL (add-on)
 
@@ -131,6 +130,22 @@ Source: [hackjunction/Junction-2026-S-pankki](https://github.com/hackjunction/Ju
 - Already built in `coach/web_search.py`, off by default (`COACH_WEB_SEARCH=1` to enable).
 - For outside facts like Statistics Finland benchmarks. Never sent personal data.
 
+## Where the data goes
+
+The hosted demo (https://arvon-johannes--financial-coach.modal.run) stores and processes data and runs the AI model in the EU, but **requests from the phone enter through Modal's web gateway in the United States**. Every Modal web address is served by that gateway, whether or not the address shows its region (it also answers as `….us-east.modal.run`).
+
+| Step | Where | What passes through or is kept there |
+|---|---|---|
+| 1. Phone → **Modal's web gateway** | **United States** (AWS us-east-1, Virginia) | Every request and answer: the app's files, the demo passcode, the chosen customer ID, chat messages and answers, the figures shown. HTTPS from the phone; the gateway handles the connection and forwards it to our server. We store nothing here. |
+| 2. **Coach server** (FastAPI on Modal) | **EU** (Modal `region="eu"`; 12.6 ms to the database in Frankfurt) | Runs the tools and calculations. Conversations are kept in memory only, and lost when the server sleeps or restarts. |
+| 3. **Database** (Aiven PostgreSQL) | **EU**: Frankfurt, Germany | All transactions, at rest. Read-only for the coach, one customer at a time. |
+| 4. **AI model** (Gemma 4 on Verda) | **EU**: Finland (Verda, a Finnish GPU cloud) | The conversation and the customer's figures from the tools: what the model needs to answer. |
+| Not used in the demo | Claude API (US; development only, `COACH_MODEL=claude`) and Exa web search (US; off, and never sent personal data) | Nothing |
+
+**What we say to judges:** the customer's data is stored in the EU (Frankfurt), processed in the EU (our server on Modal) and handled by the model in the EU (Verda, Finland). Traffic between the phone and our server passes through Modal's gateway in the US, encrypted. The data is S-Pankki's synthetic dataset, so no real customer data is involved.
+
+**In production** S-Bank would serve the coach from its own EU infrastructure, so this hop disappears: it comes from how we host the hackathon demo. To remove it in the demo too, the web server would have to run on an EU host whose front door is also in the EU, instead of Modal.
+
 ## Build order
 
 1. **Data:** ✅ done. Aiven PostgreSQL 18 (Frankfurt, Developer-1 plan) loaded with all 3.6M transactions via `scripts/load_data.py`.
@@ -147,9 +162,9 @@ The S-Pankki challenge is the main prize: a polished coach beats many half-worki
 ## Open questions
 
 - [ ] Can teams enter multiple tech challenges? (Organisers)
-- [ ] Verda data-centre country. (Verda booth) GPU types and prices are known: 1× H100 at €5.15/h.
+- [ ] Confirm Verda's data-centre country for our container. We state EU (Finland) in "Where the data goes" and the README; correct both if it differs. (Verda console or booth) GPU types and prices are known: 1× H100 at €5.15/h.
 - [x] Is Gemma 4 reliable enough at tool calls? Yes: 31B FP8 passed the first English and Finnish tests.
-- [ ] Where does the demo backend run? (Modal, Aiven or Verda)
+- [x] Where does the demo backend run? Modal, EU region, behind Modal's US web gateway (see "Where the data goes").
 - [ ] Gemma challenge submission requirements. (Google DeepMind booth / Discord)
 - [ ] Are "Salary Sweep" and "Invest Withdraw" transfers between accounts rather than spending? (S-Bank data scientist mentor)
 - [ ] Who on the team owns which component?

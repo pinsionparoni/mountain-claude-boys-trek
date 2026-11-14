@@ -2,6 +2,7 @@
 // team's permission), then the demo log-in where you pick the language and customer.
 import { useState } from "react";
 import { demoCustomers } from "../fixtures/demo";
+import { savedPasscode } from "../lib/api";
 import type { Lang, Text } from "../lib/i18n";
 import animationUrl from "../assets/smobiili/s-logo-animation.mp4";
 import { SLogo } from "./SLogo";
@@ -12,13 +13,17 @@ interface Props {
   customerId: string;
   onLang: (lang: Lang) => void;
   onCustomer: (id: string) => void;
-  onLogin: () => void;
+  /** The hosted demo asks for a passcode; locally there is none. */
+  passcodeRequired: boolean;
+  passcodeError: boolean;
+  onLogin: (passcode: string) => void;
 }
 
 const reducedMotion = () => window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
 
-export function LoginScreen({ t, lang, customerId, onLang, onCustomer, onLogin }: Props) {
+export function LoginScreen({ t, lang, customerId, onLang, onCustomer, passcodeRequired, passcodeError, onLogin }: Props) {
   const [ready, setReady] = useState(reducedMotion);
+  const [code, setCode] = useState(savedPasscode);
 
   return (
     <div className="sm-login">
@@ -30,7 +35,7 @@ export function LoginScreen({ t, lang, customerId, onLang, onCustomer, onLogin }
       </div>
 
       <form className={`sm-login-form${ready ? " is-visible" : ""}`} aria-hidden={!ready}
-            onSubmit={(e) => { e.preventDefault(); onLogin(); }}>
+            onSubmit={(e) => { e.preventDefault(); onLogin(code.trim()); }}>
         <h1 className="sm-login-title">{t.home.loginTitle}</h1>
         <p className="sm-login-lead">{t.home.loginLead}</p>
 
@@ -48,6 +53,17 @@ export function LoginScreen({ t, lang, customerId, onLang, onCustomer, onLogin }
             {demoCustomers.map((c) => <option key={c.id} value={c.id}>{c[lang]}</option>)}
           </select>
         </label>
+
+        {passcodeRequired && (
+          <label className="sm-login-field">
+            <span>{t.passcode}</span>
+            <input id="demo-passcode" type="password" value={code} onChange={(e) => setCode(e.target.value)}
+                   autoComplete="off" autoCapitalize="none" spellCheck={false} required
+                   aria-invalid={passcodeError} aria-describedby={passcodeError ? "passcode-error" : undefined}
+                   tabIndex={ready ? 0 : -1} />
+          </label>
+        )}
+        {passcodeError && <p id="passcode-error" className="sm-login-error" role="alert">{t.passcodeWrong}</p>}
 
         <button type="submit" className="sm-login-button" tabIndex={ready ? 0 : -1}>{t.home.loginButton}</button>
         <p className="sm-login-badge">{t.demoBadge}</p>

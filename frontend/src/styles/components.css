@@ -281,6 +281,14 @@ h1, h2, p { margin: 0; }
 /* On a phone the mock-up fills the screen; on wider screens it sits in a phone frame. */
 .phone { flex: 1; min-block-size: 0; display: flex; }
 .phone-screen { flex: 1; min-inline-size: 0; display: flex; flex-direction: column; background: var(--sp-white); position: relative; }
+/* Installed full-screen (PWA), the page reaches under the notch, status bar,
+   iPhone home indicator and Android gesture bar (viewport-fit=cover). Keep
+   the header, tab bar and chat input clear of them. 0 in a normal browser tab. */
+.phone-screen {
+  padding:
+    env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px)
+    env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px);
+}
 
 @media (min-width: 600px) {
   .phone { flex: 0 0 auto; align-self: center; margin-block: var(--sp-space-6); }
@@ -290,6 +298,7 @@ h1, h2, p { margin: 0; }
     border: 10px solid var(--sp-neutral-strongest);
     border-radius: 48px;
     overflow: hidden;
+    padding: 0; /* the drawn phone frame has no notch */
   }
 }
 
@@ -606,7 +615,8 @@ html, body, #root { block-size: 100%; overflow: hidden; }
 .sm-login-lang { justify-self: start; }
 .sm-login-lang button { padding-inline: var(--sp-space-4); }
 .sm-login-field { display: grid; gap: var(--sp-space-1); font-size: var(--sp-font-size-small); color: var(--sp-neutral-secondary); }
-.sm-login-field select {
+.sm-login-field select,
+.sm-login-field input {
   min-block-size: var(--sp-control-min-height);
   padding-inline: var(--sp-space-3);
   border: 1px solid var(--sp-border-default);
@@ -628,6 +638,7 @@ html, body, #root { block-size: 100%; overflow: hidden; }
   font-weight: var(--sp-weight-bold);
   cursor: pointer;
 }
+.sm-login-error { margin: 0; font-size: var(--sp-font-size-small); color: var(--sp-error-text); }
 .sm-login-badge { justify-self: center; font-size: 0.8rem; color: var(--sp-neutral-secondary); }
 
 /* Home: Bonus hero, counts, receipts */
