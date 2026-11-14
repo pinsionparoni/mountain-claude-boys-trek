@@ -18,6 +18,7 @@ Full brief: [CHALLENGE.md](CHALLENGE.md)
   2. 🔧 Unexpected necessities / Yllättävät menot (the dentist, a broken washing machine),
   3. ☕ Everyday spending / Arjen kulutus (coffees, takeaway, taxis).
 - **A monthly budget and safe to spend this week:** income minus essentials, a reserve for surprises and usual savings gives the everyday budget; the coach tells you what's left this week and checks your account can cover the bills before payday.
+- **"What kind of spender am I?":** compares your spending with people your age (Statistics Finland's age bands) and with everyone, per category and per basket: "you spend less on travel than 85% of people aged 18–24". Only medians and ranks are used, never another customer's data.
 - **Computes, doesn't guess:** every number comes from code run on your own transactions; the AI only explains it.
 - **Keeps customer data in Europe** by running Google's open Gemma 4 model on our own server at Verda, instead of sending it to an outside AI service.
 - **Optional benchmarks** from open sources such as Statistics Finland, without ever sending personal data to a search engine.
