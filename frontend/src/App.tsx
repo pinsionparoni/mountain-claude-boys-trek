@@ -1,8 +1,16 @@
 import { useEffect, useState } from "react";
 import { uiConfig } from "./config/ui.config";
 import { BasketOverview } from "./components/BasketOverview";
-import { SafeToSpendCard } from "./components/SafeToSpendCard";
+import { BottomNav, type Tab } from "./components/BottomNav";
 import { Chat } from "./components/Chat";
+import { EtukorttiPage } from "./components/EtukorttiPage";
+import { BackIcon } from "./components/Icons";
+import { LoginScreen } from "./components/LoginScreen";
+import { MessageCentre } from "./components/MessageCentre";
+import { MinaPage } from "./components/MinaPage";
+import { PankkiPage } from "./components/PankkiPage";
+import { SafeToSpendCard } from "./components/SafeToSpendCard";
+import { SmobiiliHome } from "./components/SmobiiliHome";
 import { demoCustomers } from "./fixtures/demo";
 import { fetchBudget, fetchSummary } from "./lib/api";
 import { formatDay, text, type Lang } from "./lib/i18n";
@@ -14,9 +22,9 @@ function savedLang(): Lang {
   const fromUrl = new URLSearchParams(window.location.search).get("lang");
   if (fromUrl === "fi" || fromUrl === "en") return fromUrl;  // e.g. a shared demo link ?lang=fi
   try {
-    return localStorage.getItem(LANG_KEY) === "fi" ? "fi" : "en";
+    return localStorage.getItem(LANG_KEY) === "en" ? "en" : "fi";
   } catch {
-    return "en";
+    return "fi";
   }
 }
 
@@ -26,6 +34,10 @@ const periodLabel = ({ start_date, end_date }: BasketSummary["period"], lang: La
 export default function App() {
   const [lang, setLang] = useState<Lang>(savedLang);
   const [customerId, setCustomerId] = useState(demoCustomers[0].id);
+  const [loggedIn, setLoggedIn] = useState(false);
+  const [tab, setTab] = useState<Tab>("home");
+  // Message centre and coach open over the tabs, like full screens in S-mobiili.
+  const [overlay, setOverlay] = useState<null | "messages" | "coach">(null);
   const [summary, setSummary] = useState<BasketSummary | null>(null);
   const [budget, setBudget] = useState<Budget | null>(null);
   const [error, setError] = useState(false);
@@ -43,6 +55,10 @@ export default function App() {
     setError(false);
   };
 
+  const login = () => { setTab("home"); setOverlay(null); setLoggedIn(true); };
+  const logout = () => { setOverlay(null); setLoggedIn(false); };
+  const openMessages = () => setOverlay("messages");
+
   useEffect(() => {
     let current = true;
     Promise.all([fetchSummary(customerId), fetchBudget(customerId)])
@@ -55,50 +71,60 @@ export default function App() {
 
   return (
     <div className="sp-coach app" data-card-style={uiConfig.cardStyle}>
-      <header className="app-header">
-        <span className="app-name">{t.appName}</span>
-        <div className="lang-switch" role="group" aria-label={t.language}>
-          {(["en", "fi"] as const).map((l) => (
-            <button key={l} type="button" aria-pressed={lang === l} onClick={() => setLang(l)}>
-              {l.toUpperCase()}
-            </button>
-          ))}
-        </div>
-        <label className="customer-picker">
-          <span className="visually-hidden">{t.demoCustomer}</span>
-          <select value={customerId} onChange={(e) => pickCustomer(e.target.value)}>
-            {demoCustomers.map((c) => <option key={c.id} value={c.id}>{c[lang]}</option>)}
-          </select>
-        </label>
-        <span className="demo-badge">{t.demoBadge}</span>
-      </header>
+      <div className="phone">
+        <div className="phone-screen">
+          {!loggedIn ? (
+            <LoginScreen t={t} lang={lang} customerId={customerId}
+                         onLang={setLang} onCustomer={pickCustomer} onLogin={login} />
+          ) : (
+            <>
+              {error && <p className="notice notice--error" role="alert">{t.loadError}</p>}
 
-      <main className="app-main">
-        {uiConfig.showWelcomePanel && (
-          <section className="welcome">
-            <h1 className="page-title">{t.title}</h1>
-            <p className="lead">{t.lead}</p>
-          </section>
-        )}
+              <div className="sm-screen" hidden={overlay !== null}>
+                <main className="sm-scroll">
+                  {tab === "home" && <SmobiiliHome t={t} lang={lang} budget={budget}
+                                                   onOpenMessages={openMessages} onLogout={logout} />}
+                  {tab === "card" && <EtukorttiPage t={t} />}
+                  {tab === "bank" && <PankkiPage t={t} lang={lang} budget={budget} summary={summary}
+                                                 onOpenMessages={openMessages} />}
+                  {tab === "me" && <MinaPage t={t} customerId={customerId} onOpenMessages={openMessages} />}
+                </main>
+                <BottomNav t={t} active={tab} onSelect={setTab} />
+              </div>
 
-        <div className="layout">
-          <div className="layout-side">
-            {error && <p className="notice notice--error" role="alert">{t.loadError}</p>}
-            {!error && !budget && <p className="panel muted">{t.loading}</p>}
-            {budget && <SafeToSpendCard budget={budget} t={t} lang={lang} />}
-            {uiConfig.showBasketOverview && summary && (
-              <BasketOverview
-                summary={summary}
-                periodLabel={periodLabel(summary.period, lang)}
-                showBars={uiConfig.showSpendingChart && uiConfig.chartStyle === "bars"}
-                t={t}
-                lang={lang}
-              />
-            )}
-          </div>
-          <Chat key={customerId} customerId={customerId} t={t} showSuggestions={uiConfig.showSuggestionChips} />
+              <div className="sm-screen" hidden={overlay !== "messages"}>
+                <MessageCentre t={t} onBack={() => setOverlay(null)} onOpenCoach={() => setOverlay("coach")} />
+              </div>
+
+              {/* Kept mounted while hidden so the conversation survives a trip back. */}
+              <div className="sm-screen" hidden={overlay !== "coach"}>
+                <header className="sm-header">
+                  <button type="button" className="sm-icon-button" aria-label={t.home.back}
+                          onClick={() => setOverlay("messages")}>
+                    <BackIcon />
+                  </button>
+                  <h1 className="sm-header-title">{t.appName}</h1>
+                  <span />
+                </header>
+                <Chat key={customerId} customerId={customerId} t={t} showSuggestions={uiConfig.showSuggestionChips}>
+                  {!error && !budget && <p className="panel muted">{t.loading}</p>}
+                  {budget && <SafeToSpendCard budget={budget} t={t} lang={lang} />}
+                  {uiConfig.showBasketOverview && summary && (
+                    <BasketOverview
+                      summary={summary}
+                      periodLabel={periodLabel(summary.period, lang)}
+                      showBars={uiConfig.showSpendingChart && uiConfig.chartStyle === "bars"}
+                      t={t}
+                      lang={lang}
+                    />
+                  )}
+                </Chat>
+              </div>
+            </>
+          )}
         </div>
-      </main>
+      </div>
+      <p className="phone-caption">{t.demoBadge}</p>
     </div>
   );
 }

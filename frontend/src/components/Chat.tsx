@@ -1,27 +1,34 @@
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { streamChat } from "../lib/api";
 import { formatAnswer } from "../lib/formatAnswer";
 import type { Text } from "../lib/i18n";
 import type { ChatMessage } from "../lib/types";
+import { SendIcon } from "./Icons";
 
 interface Props {
   customerId: string;
   t: Text;
   showSuggestions: boolean;
+  children?: ReactNode;  // cards shown above the conversation
 }
 
-// The composer, history and status live outside ui.config: they are core behaviour.
+// The coach screen's body: a scrolling area (cards, conversation, suggestions) and an
+// input bar pinned to the bottom, like S-mobiili's tab bar. The composer, history and
+// status live outside ui.config: they are core behaviour.
 // Parent renders it with key={customerId}, so a new customer starts a new conversation.
-export function Chat({ customerId, t, showSuggestions }: Props) {
+export function Chat({ customerId, t, showSuggestions, children }: Props) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [draft, setDraft] = useState("");
   const [status, setStatus] = useState("");
   const [busy, setBusy] = useState(false);
   const conversationId = useRef<string | null>(null);
-  const logEnd = useRef<HTMLLIElement>(null);
+  const scroller = useRef<HTMLElement>(null);
 
+  // Scroll only the conversation area to the newest text. (scrollIntoView would also
+  // scroll the page around the phone.)
   useEffect(() => {
-    logEnd.current?.scrollIntoView({ block: "end" });
+    const el = scroller.current;
+    if (el && messages.length) el.scrollTop = el.scrollHeight;
   }, [messages, status]);
 
   const appendToAnswer = (id: string, text: string) =>
@@ -65,38 +72,45 @@ export function Chat({ customerId, t, showSuggestions }: Props) {
   const shown: ChatMessage[] = [{ id: "greeting", author: "assistant", text: t.greeting }, ...messages];
 
   return (
-    <section className="panel chat" aria-labelledby="chat-title">
-      <h2 id="chat-title" className="panel-title">{t.chatTitle}</h2>
-      <ol className="chat-log" aria-label={t.conversation}>
-        {shown
-          .filter((m) => m.text)
-          .map((m) => (
-            <li key={m.id} className={`chat-message chat-message--${m.author}`}>
-              <span className="visually-hidden">{m.author === "user" ? t.you : t.coach}</span>
-              {m.author === "assistant" ? <div className="answer">{formatAnswer(m.text)}</div> : m.text}
-            </li>
-          ))}
-        {status && <li className="chat-status muted" aria-hidden="true">{status}</li>}
-        <li ref={logEnd} aria-hidden="true" />
-      </ol>
-      <p className="visually-hidden" role="status" aria-live="polite">{busy ? status : ""}</p>
+    <>
+      <main className="sm-scroll sm-coach" ref={scroller}>
+        {children}
+        <section className="chat" aria-label={t.chatTitle}>
+          <ol className="chat-log" aria-label={t.conversation}>
+            {shown
+              .filter((m) => m.text)
+              .map((m) => (
+                <li key={m.id} className={`chat-message chat-message--${m.author}`}>
+                  <span className="visually-hidden">{m.author === "user" ? t.you : t.coach}</span>
+                  {m.author === "assistant" ? <div className="answer">{formatAnswer(m.text)}</div> : m.text}
+                </li>
+              ))}
+            {status && (
+              <li className="chat-status" aria-hidden="true">
+                <span className="chat-status-dots"><i /><i /><i /></span>{status}
+              </li>
+            )}
+          </ol>
+          <p className="visually-hidden" role="status" aria-live="polite">{busy ? status : ""}</p>
 
-      {showSuggestions && (
-        <div className="chips" aria-label={t.suggested}>
-          {t.suggestions.map((s) => (
-            <button key={s} type="button" className="chip" disabled={busy} onClick={() => void send(s)}>
-              {s}
-            </button>
-          ))}
-        </div>
-      )}
+          {showSuggestions && !messages.length && (
+            <div className="chips" aria-label={t.suggested}>
+              {t.suggestions.map((s) => (
+                <button key={s} type="button" className="chip" disabled={busy} onClick={() => void send(s)}>
+                  {s}
+                </button>
+              ))}
+            </div>
+          )}
+        </section>
+      </main>
 
-      <form className="composer" onSubmit={onSubmit}>
+      <form className="sm-composer" onSubmit={onSubmit}>
         <label htmlFor="composer-input" className="visually-hidden">{t.composerLabel}</label>
         <textarea
           id="composer-input"
-          className="composer-input"
-          rows={2}
+          className="sm-composer-input"
+          rows={1}
           value={draft}
           placeholder={t.placeholder}
           onChange={(e) => setDraft(e.target.value)}
@@ -107,8 +121,10 @@ export function Chat({ customerId, t, showSuggestions }: Props) {
             }
           }}
         />
-        <button type="submit" className="button button--primary" disabled={busy}>{t.send}</button>
+        <button type="submit" className="sm-send" disabled={busy || !draft.trim()} aria-label={t.send}>
+          <SendIcon />
+        </button>
       </form>
-    </section>
+    </>
   );
 }

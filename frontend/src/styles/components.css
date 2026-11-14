@@ -270,3 +270,437 @@ h1, h2, p { margin: 0; }
   cursor: pointer;
 }
 .lang-switch button[aria-pressed="true"] { background: var(--sp-button-primary-bg); }
+
+/* ------------------------------------------------------------------------
+   S-mobiili mock-up: demo bar, phone frame, home screen, coach screen.
+   Layout follows S-mobiili screenshots; values come from tokens.css.
+   ------------------------------------------------------------------------ */
+
+.app { display: flex; flex-direction: column; block-size: 100dvh; background: var(--sp-surface-neutral); }
+
+/* On a phone the mock-up fills the screen; on wider screens it sits in a phone frame. */
+.phone { flex: 1; min-block-size: 0; display: flex; }
+.phone-screen { flex: 1; min-inline-size: 0; display: flex; flex-direction: column; background: var(--sp-white); position: relative; }
+
+@media (min-width: 600px) {
+  .phone { flex: 0 0 auto; align-self: center; margin-block: var(--sp-space-6); }
+  .phone-screen {
+    inline-size: 390px;
+    block-size: min(844px, calc(100dvh - 120px));
+    border: 10px solid var(--sp-neutral-strongest);
+    border-radius: 48px;
+    overflow: hidden;
+  }
+}
+
+.sm-screen { flex: 1; min-block-size: 0; display: flex; flex-direction: column; }
+.sm-screen[hidden] { display: none; }
+.sm-scroll { flex: 1; min-block-size: 0; overflow-y: auto; background: var(--sp-green-pale); }
+
+.sm-icon-button {
+  position: relative;
+  display: grid;
+  place-items: center;
+  inline-size: 44px;
+  block-size: 44px;
+  border: 0;
+  background: none;
+  color: var(--sp-neutral-strongest);
+  cursor: pointer;
+}
+
+.sm-badge {
+  position: absolute;
+  inset-block-start: 2px;
+  inset-inline-end: -6px;
+  padding: 0 6px;
+  border-radius: var(--sp-radius-pill);
+  background: var(--sp-green-strong);
+  color: var(--sp-white);
+  font-size: 0.7rem;
+  font-weight: var(--sp-weight-bold);
+  line-height: 1.5;
+}
+
+.sm-link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-space-1);
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--sp-green-strong);
+  font: inherit;
+  font-weight: var(--sp-weight-medium);
+  cursor: pointer;
+}
+
+/* Home: white top area */
+.sm-topbar { display: flex; justify-content: flex-end; padding: var(--sp-space-3) var(--sp-space-4) 0; background: var(--sp-white); }
+
+.sm-hero {
+  display: grid;
+  justify-items: center;
+  gap: var(--sp-space-6);
+  padding: var(--sp-space-4) var(--sp-space-6) var(--sp-space-8);
+  background: var(--sp-white);
+  text-align: center;
+}
+
+.sm-hero-house {
+  display: grid;
+  justify-items: center;
+  gap: var(--sp-space-3);
+  padding: var(--sp-space-12) var(--sp-space-6) var(--sp-space-6);
+  color: var(--sp-green-strong);
+  background: linear-gradient(var(--sp-green-pale-secondary), var(--sp-white));
+  clip-path: polygon(50% 0, 100% 18%, 100% 100%, 0 100%, 0 18%);
+}
+
+.sm-hero-title { font-size: 1.35rem; line-height: 1.25; font-weight: var(--sp-weight-bold); color: var(--sp-green-strong); }
+.sm-hero-link { font-size: 1.15rem; font-weight: var(--sp-weight-bold); }
+
+/* Home: pale green part */
+.sm-section { display: grid; gap: var(--sp-space-4); padding: var(--sp-space-6) var(--sp-space-4); }
+
+.sm-actions { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--sp-space-2); }
+
+.sm-action {
+  display: grid;
+  justify-items: center;
+  gap: var(--sp-space-2);
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--sp-neutral-strongest);
+  font: inherit;
+  font-size: var(--sp-font-size-small);
+  text-align: center;
+  cursor: pointer;
+}
+.sm-action[aria-disabled="true"] { cursor: default; }
+
+.sm-action-circle {
+  display: grid;
+  place-items: center;
+  inline-size: 56px;
+  block-size: 56px;
+  border-radius: 50%;
+  background: var(--sp-green-strong);
+  color: var(--sp-white);
+}
+.sm-action--coach .sm-action-circle { background: var(--sp-button-primary-bg); color: var(--sp-green-strongest); }
+
+.sm-heading { font-size: 1.5rem; line-height: 1.2; font-weight: var(--sp-weight-bold); color: var(--sp-green-strong); }
+
+.sm-card { display: grid; justify-items: center; gap: var(--sp-space-2); padding: var(--sp-space-5); border-radius: 16px; background: var(--sp-white); text-align: center; }
+.sm-balance { font-size: 2.25rem; line-height: 1.1; font-weight: var(--sp-weight-bold); color: var(--sp-green-strong); }
+
+/* Tab bar */
+.sm-tabbar {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  padding: var(--sp-space-2) 0 var(--sp-space-3);
+  border-block-start: 1px solid var(--sp-border-subtle);
+  background: var(--sp-white);
+}
+.sm-tab { display: grid; justify-items: center; gap: 2px; font-size: 0.75rem; color: var(--sp-neutral-secondary); }
+.sm-tab--active { color: var(--sp-neutral-strongest); }
+.sm-tab--active svg { color: var(--sp-green-medium); }
+
+/* Coach screen */
+.sm-header {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) 44px;
+  align-items: center;
+  padding: var(--sp-space-2) var(--sp-space-2);
+  border-block-end: 1px solid var(--sp-border-subtle);
+  background: var(--sp-white);
+}
+.sm-header-title { text-align: center; font-size: 1.15rem; font-weight: var(--sp-weight-bold); color: var(--sp-neutral-strongest); }
+
+.sm-coach { display: grid; gap: var(--sp-space-4); align-content: start; padding: var(--sp-space-4); }
+.sm-coach .panel { padding: var(--sp-space-4); border-color: transparent; }
+.sm-coach .panel--highlight { background: var(--sp-white); }
+.sm-coach .panel-title { font-size: 1.25rem; color: var(--sp-green-strong); }
+
+/* Mock-up refinements */
+.sm-badge { inset-block-start: -2px; inset-inline-end: -14px; }
+
+
+/* ------------------------------------------------------------------------
+   S-mobiili logged-in look: list cards, Message centre, aligned chat.
+   ------------------------------------------------------------------------ */
+
+.sm-topbar { justify-content: space-between; align-items: center; padding: var(--sp-space-3) var(--sp-space-3); }
+.sm-hero { padding-block-end: var(--sp-space-4); }
+.sm-dots { display: flex; gap: 8px; }
+.sm-dots i { inline-size: 8px; block-size: 8px; border-radius: 50%; background: var(--sp-border-subtle); }
+.sm-dots i.on { background: var(--sp-neutral-secondary); }
+.sm-action { cursor: default; }
+
+/* List cards: rows with a green line icon, title, grey subtitle, chevron or amount. */
+.sm-list { display: grid; justify-items: stretch; gap: 0; padding: 0 0 0 var(--sp-space-4); text-align: start; }
+.sm-row {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--sp-space-3);
+  min-block-size: 64px;
+  padding: var(--sp-space-3) var(--sp-space-4) var(--sp-space-3) 0;
+  border: 0;
+  border-block-end: 1px solid var(--sp-border-subtle);
+  background: none;
+  color: var(--sp-neutral-strongest);
+  font: inherit;
+  text-align: start;
+}
+.sm-list > .sm-row:last-child { border-block-end: 0; }
+button.sm-row { cursor: pointer; }
+.sm-row-icon { color: var(--sp-green-medium); display: grid; }
+.sm-row-text { display: grid; gap: 2px; min-inline-size: 0; }
+.sm-row-title { font-size: 1.05rem; }
+.sm-row-sub { color: var(--sp-neutral-secondary); font-size: 0.95rem; }
+.sm-row-end { color: var(--sp-neutral-secondary); display: grid; }
+.sm-row--highlight .sm-row-title { font-weight: var(--sp-weight-bold); color: var(--sp-green-strong); }
+.sm-amount { font-size: 1.25rem; font-weight: var(--sp-weight-bold); color: var(--sp-green-strong); }
+.sm-pill {
+  padding: 2px 10px;
+  border-radius: var(--sp-radius-pill);
+  background: var(--sp-green-strong);
+  color: var(--sp-white);
+  font-size: 0.8rem;
+  font-weight: var(--sp-weight-bold);
+}
+.sm-list-footer {
+  padding: var(--sp-space-4) var(--sp-space-4) var(--sp-space-4) 0;
+  text-align: center;
+  color: var(--sp-green-strong);
+  font-size: 1.05rem;
+  border-block-start: 1px solid var(--sp-border-subtle);
+}
+
+/* Coach screen: cards, then the conversation, input pinned at the bottom. */
+.sm-coach { gap: var(--sp-space-4); padding: var(--sp-space-4); }
+.sm-coach .panel { border-radius: 16px; gap: var(--sp-space-2); }
+.sm-coach .panel-title { font-size: 1.1rem; font-weight: var(--sp-weight-bold); color: var(--sp-green-strong); }
+.sm-coach .sts-amount { color: var(--sp-green-strong); font-family: var(--sp-font-body); font-size: 2.5rem; }
+.sm-coach .chat { display: grid; gap: var(--sp-space-3); }
+
+.chat-log { gap: var(--sp-space-2); }
+.chat-message {
+  max-inline-size: 85%;
+  padding: var(--sp-space-3) var(--sp-space-4);
+  border: 0;
+  border-radius: 18px;
+  font-size: 1rem;
+  line-height: 1.45;
+}
+.chat-message--assistant { background: var(--sp-white); color: var(--sp-neutral-strongest); border: 0; border-end-start-radius: 4px; }
+.chat-message--user { background: var(--sp-green-strong); color: var(--sp-white); border-end-end-radius: 4px; }
+.answer strong { color: inherit; }
+
+.chat-status { display: flex; align-items: center; gap: var(--sp-space-2); padding-inline: var(--sp-space-1); color: var(--sp-neutral-secondary); font-size: 0.9rem; }
+.chat-status-dots { display: inline-flex; gap: 3px; }
+.chat-status-dots i {
+  inline-size: 6px; block-size: 6px; border-radius: 50%;
+  background: var(--sp-green-medium);
+  animation: sm-dot 1.2s var(--sp-ease-default) infinite;
+}
+.chat-status-dots i:nth-child(2) { animation-delay: 0.15s; }
+.chat-status-dots i:nth-child(3) { animation-delay: 0.3s; }
+@keyframes sm-dot { 0%, 80%, 100% { opacity: 0.25; } 40% { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .chat-status-dots i { animation: none; opacity: 0.6; } }
+
+.sm-coach .chips { display: grid; gap: var(--sp-space-2); justify-items: start; }
+.sm-coach .chip {
+  min-block-size: 44px;
+  border: 0;
+  border-radius: 14px;
+  background: var(--sp-white);
+  color: var(--sp-green-strong);
+  font-size: 0.95rem;
+  font-weight: var(--sp-weight-medium);
+  text-align: start;
+}
+.sm-coach .chip:hover { background: var(--sp-button-tonal-bg-hover); }
+
+.sm-composer {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--sp-space-2);
+  padding: var(--sp-space-2) var(--sp-space-3) var(--sp-space-3);
+  border-block-start: 1px solid var(--sp-border-subtle);
+  background: var(--sp-white);
+}
+.sm-composer-input {
+  flex: 1;
+  min-inline-size: 0;
+  min-block-size: 44px;
+  max-block-size: 120px;
+  padding: 10px var(--sp-space-4);
+  border: 1px solid var(--sp-border-default);
+  border-radius: 22px;
+  font: inherit;
+  color: var(--sp-neutral-strongest);
+  resize: none;
+  field-sizing: content;
+}
+.sm-composer-input:focus-visible { outline-offset: 0; border-color: var(--sp-green-strong); }
+.sm-send {
+  display: grid;
+  place-items: center;
+  flex: 0 0 44px;
+  block-size: 44px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--sp-green-strong);
+  color: var(--sp-white);
+  cursor: pointer;
+}
+.sm-send:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* ------------------------------------------------------------------------
+   Login, S logo, tab pages. Page scrolling is locked: only areas inside the
+   phone scroll (.sm-scroll), and they don't hand their scroll to the page.
+   ------------------------------------------------------------------------ */
+
+html, body, #root { block-size: 100%; overflow: hidden; }
+.sm-scroll { overscroll-behavior: contain; }
+
+.app { align-items: center; }
+.phone { inline-size: 100%; }
+@media (min-width: 600px) {
+  .phone { inline-size: auto; }
+  .phone-screen { block-size: min(844px, calc(100dvh - 72px)); }
+}
+.phone-caption { display: none; }
+@media (min-width: 600px) {
+  .phone-caption { display: block; margin: 0 0 var(--sp-space-4); color: var(--sp-neutral-secondary); font-size: var(--sp-font-size-small); }
+}
+
+/* S logo: a mask, coloured with background-color. Aspect ratio of the source art. */
+.s-logo { display: inline-block; aspect-ratio: 148 / 233; background-color: currentColor; mask-size: contain; mask-repeat: no-repeat; mask-position: center; -webkit-mask-size: contain; -webkit-mask-repeat: no-repeat; -webkit-mask-position: center; }
+
+/* Login */
+.sm-login { flex: 1; display: grid; grid-template-rows: 1fr auto; background: #00aa45; color: var(--sp-white); overflow-y: auto; }
+.sm-login-logo { display: grid; place-items: center; min-block-size: 260px; }
+.sm-login-logo video { inline-size: 240px; block-size: 240px; }
+.sm-login-static { block-size: 128px; color: var(--sp-white); }
+.sm-login-form {
+  display: grid;
+  gap: var(--sp-space-3);
+  margin: 0 var(--sp-space-4) var(--sp-space-6);
+  padding: var(--sp-space-6) var(--sp-space-5);
+  border-radius: 24px;
+  background: var(--sp-white);
+  color: var(--sp-neutral-strongest);
+  opacity: 0;
+  transform: translateY(16px);
+  transition: opacity var(--sp-duration-slow) var(--sp-ease-entry), transform var(--sp-duration-slow) var(--sp-ease-entry);
+  pointer-events: none;
+}
+.sm-login-form.is-visible { opacity: 1; transform: none; pointer-events: auto; }
+.sm-login-title { font-size: 1.4rem; line-height: 1.2; font-weight: var(--sp-weight-bold); color: var(--sp-green-strong); }
+.sm-login-lead { color: var(--sp-neutral-secondary); font-size: 0.95rem; }
+.sm-login-lang { justify-self: start; }
+.sm-login-lang button { padding-inline: var(--sp-space-4); }
+.sm-login-field { display: grid; gap: var(--sp-space-1); font-size: var(--sp-font-size-small); color: var(--sp-neutral-secondary); }
+.sm-login-field select {
+  min-block-size: var(--sp-control-min-height);
+  padding-inline: var(--sp-space-3);
+  border: 1px solid var(--sp-border-default);
+  border-radius: var(--sp-radius-input);
+  background: var(--sp-white);
+  color: var(--sp-neutral-strongest);
+  font: inherit;
+  font-size: 1rem;
+  max-inline-size: 100%;
+}
+.sm-login-button {
+  min-block-size: 52px;
+  border: 0;
+  border-radius: var(--sp-radius-pill);
+  background: var(--sp-green-strong);
+  color: var(--sp-white);
+  font: inherit;
+  font-size: 1.05rem;
+  font-weight: var(--sp-weight-bold);
+  cursor: pointer;
+}
+.sm-login-badge { justify-self: center; font-size: 0.8rem; color: var(--sp-neutral-secondary); }
+
+/* Home: Bonus hero, counts, receipts */
+.sm-hero-logo { block-size: 52px; color: var(--sp-green-medium); }
+.sm-hero-sub { display: inline-flex; align-items: center; gap: var(--sp-space-1); color: var(--sp-green-strong); font-size: 0.95rem; }
+.sm-hero-sub svg { inline-size: 18px; block-size: 18px; }
+.sm-hero-link { cursor: default; }
+.sm-count { display: grid; place-items: center; inline-size: 28px; block-size: 28px; border-radius: 50%; background: var(--sp-green-strong); color: var(--sp-white); font-weight: var(--sp-weight-bold); font-size: 0.95rem; }
+.sm-product-icon { inline-size: 30px; block-size: auto; }
+.sm-receipt-amount { font-size: 1.05rem; color: var(--sp-neutral-strongest); }
+.sm-heading-row { display: flex; align-items: baseline; justify-content: space-between; }
+.sm-heading-row .sm-link { cursor: default; }
+
+/* Tab bar as buttons */
+.sm-tab { border: 0; background: none; font: inherit; font-size: 0.75rem; cursor: pointer; padding: 0; }
+.sm-tab-logo { block-size: 24px; color: var(--sp-neutral-secondary); }
+.sm-tab--active .sm-tab-logo { color: var(--sp-green-medium); }
+
+/* Page tops */
+.sm-topbar--titled { align-items: center; }
+.sm-topbar--end { justify-content: flex-end; }
+.sm-page-title { font-size: 1.5rem; font-weight: var(--sp-weight-bold); color: var(--sp-green-strong); padding-inline-start: var(--sp-space-1); }
+
+/* S-Etukortti */
+.sm-ek-top { padding: var(--sp-space-6) var(--sp-space-4) 0; background: var(--sp-green-strongest); }
+.sm-ek-card {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-space-4);
+  padding: var(--sp-space-4) var(--sp-space-5);
+  border-radius: 12px 12px 0 0;
+  background: #00aa45;
+  color: var(--sp-white);
+}
+.sm-ek-logo { block-size: 44px; color: var(--sp-white); }
+.sm-ek-name { flex: 1; font-family: var(--sp-font-display); font-size: 1.6rem; font-weight: var(--sp-weight-bold); letter-spacing: 0.02em; }
+.sm-ek-barcode { display: grid; place-items: center; inline-size: 52px; block-size: 52px; border-radius: 50%; background: var(--sp-white); color: var(--sp-green-strongest); }
+
+.sm-tiles { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-space-3); }
+.sm-tile { display: grid; justify-items: center; gap: var(--sp-space-2); padding: var(--sp-space-5) var(--sp-space-2); border-radius: 16px; background: var(--sp-white); color: var(--sp-neutral-strongest); text-align: center; }
+
+.sm-hscroll { display: flex; gap: var(--sp-space-3); overflow-x: auto; margin-inline: calc(-1 * var(--sp-space-4)); padding-inline: var(--sp-space-4); scrollbar-width: none; overscroll-behavior-x: contain; }
+.sm-coupon { flex: 0 0 72%; display: grid; gap: 2px; padding: var(--sp-space-3); border-radius: 16px; background: var(--sp-white); }
+.sm-coupon-image { position: relative; block-size: 120px; border-radius: 12px; margin-block-end: var(--sp-space-2); background: var(--sp-surface-neutral); }
+/* Placeholder "product" shapes: neutral, no third-party packaging. */
+.sm-coupon-image--cheese { background: radial-gradient(circle at 40% 60%, #f6e7a8 0 30%, transparent 31%), radial-gradient(circle at 65% 45%, #efd98a 0 24%, transparent 25%), var(--sp-surface-neutral); }
+.sm-coupon-image--sweets { background: radial-gradient(circle at 35% 50%, #ff9fd0 0 14%, transparent 15%), radial-gradient(circle at 55% 40%, #9be7a0 0 14%, transparent 15%), radial-gradient(circle at 60% 65%, #ffd36b 0 14%, transparent 15%), var(--sp-surface-neutral); }
+.sm-coupon-image--coffee { background: radial-gradient(ellipse at 50% 55%, #7a4a2b 0 26%, transparent 27%), var(--sp-surface-neutral); }
+.sm-coupon-bookmark { position: absolute; inset-block-start: 8px; inset-inline-end: 8px; display: grid; place-items: center; inline-size: 36px; block-size: 36px; border-radius: 8px; background: var(--sp-white); }
+.sm-coupon-tag { position: absolute; inset-block-end: 8px; inset-inline-end: 8px; padding: 2px 10px; border-radius: 6px; background: var(--sp-green-strong); color: var(--sp-white); font-size: 0.85rem; }
+.sm-coupon-kind { color: var(--sp-neutral-stronger); font-size: 0.9rem; }
+.sm-coupon-name { font-weight: var(--sp-weight-medium); font-size: 1.05rem; }
+.sm-coupon-price { font-size: 2rem; font-weight: var(--sp-weight-bold); color: var(--sp-green-strong); line-height: 1.2; }
+.sm-coupon-price sup { font-size: 0.55em; }
+.sm-coupon-valid { font-size: 0.9rem; padding-block-end: var(--sp-space-2); border-block-end: 2px dotted var(--sp-border-subtle); }
+.sm-coupon-store { display: flex; align-items: center; gap: var(--sp-space-2); padding-block-start: var(--sp-space-2); font-size: 0.9rem; }
+.sm-store-badge { display: grid; place-items: center; inline-size: 26px; block-size: 26px; border-radius: 50%; background: #ffe500; color: var(--sp-neutral-strongest); font-weight: var(--sp-weight-bold); font-size: 0.8rem; }
+
+.sm-campaign { flex: 0 0 72%; display: grid; align-content: end; gap: var(--sp-space-1); min-block-size: 150px; padding: var(--sp-space-4); border-radius: 16px; color: var(--sp-white); }
+.sm-campaign--stripes { background: repeating-linear-gradient(135deg, #00aa45 0 22px, #ff9fd0 22px 44px); }
+.sm-campaign--warm { background: linear-gradient(160deg, #8a5a44, #4a2f25); }
+.sm-campaign-big { font-size: 3rem; font-weight: var(--sp-weight-bold); line-height: 1; text-shadow: 0 2px 6px rgba(0, 0, 0, 0.25); }
+.sm-campaign-text { font-weight: var(--sp-weight-bold); text-shadow: 0 1px 4px rgba(0, 0, 0, 0.35); }
+
+/* Pankki */
+.sm-basket-emoji { font-size: 1.3rem; }
+
+/* Minä */
+.sm-profile { display: grid; justify-items: center; gap: var(--sp-space-2); padding: var(--sp-space-4) var(--sp-space-4) var(--sp-space-8); background: var(--sp-white); text-align: center; }
+.sm-avatar { display: grid; place-items: center; inline-size: 104px; block-size: 104px; border-radius: 50%; background: var(--sp-green-paler-secondary); color: var(--sp-green-strong); font-size: 3.5rem; font-weight: var(--sp-weight-bold); }
+.sm-profile-name { font-size: 1.6rem; font-weight: var(--sp-weight-bold); color: var(--sp-neutral-stronger); }
+
+/* The login card's column must be able to shrink below the long customer name. */
+.sm-login { grid-template-columns: minmax(0, 1fr); }
+.sm-login-form { grid-template-columns: minmax(0, 1fr); min-inline-size: 0; }
+.sm-login-field select { inline-size: 100%; }
