@@ -1,12 +1,17 @@
 
+import json
 from datetime import date
 from functools import lru_cache
 
 from coach.database.connection import get_connection
 from coach.spending_baskets import (
+    ANY_CATEGORY,
     CONSUMPTION_TRANSACTION_TYPES,
     EXCLUDED_FROM_CONSUMPTION,
+    UNCLASSIFIED,
     UNCLASSIFIED_FINANCIAL_FLOW_NOTES,
+    basket_lookup,
+    large_purchase_thresholds,
     salary_sweep_info,
     summarize_baskets,
 )
@@ -438,24 +443,31 @@ def balance_as_of(customer_id: str, day: date) -> float | None:
     return round(float(row["balance_after_eur"]), 2) if row else None
 
 
+# Memory for the population query's sort; the server has 1 GB in all and is
+# shared by the team, so this stays modest.
+POPULATION_WORK_MEM = "32MB"
+
+
 @lru_cache(maxsize=4)
-def population_spending_by_category(
+def population_spending(
     start_date: date,
     end_date: date,
 ) -> tuple[dict, ...]:
     """
-    Return every customer's age and spending per category in a period: the
-    peer population for "what kind of spender am I?" comparisons.
+    Return every customer's age and spending in a period, per category and
+    per basket: the peer population for "what kind of spender am I?".
 
     One row per customer (all 5,100), as ``{"customer_id", "age",
-    "spending": {category: total_eur}}``. A category the customer did not
-    spend on is absent from ``spending``: callers must count it as 0 €, not
-    leave the customer out, or the peer medians come out too high.
-    Spending means the same as in ``spending_by_category`` (consumption only).
-    Dates are inclusive.
+    "spending": {category: total_eur}, "baskets": {basket_key: total_eur}}``.
+    A category or basket the customer did not spend on is absent: callers
+    must count it as 0 EUR, not leave the customer out, or the peer medians
+    come out too high. Spending means the same as in ``spending_by_category``
+    (consumption only), and each purchase is placed in a basket by the same
+    rules as ``basket_summary`` (via ``spending_baskets.basket_lookup``,
+    without any customer's own overrides). Dates are inclusive.
 
-    This scans the whole population (a 12-month period takes about 4-6 s
-    against Aiven), so results are cached per period: the dataset never
+    This scans the whole population (a 12-month period takes several
+    seconds against Aiven), so results are cached per period: the dataset never
     changes while the app runs. Treat the result as read-only.
 
     Privacy: this is other customers' data. Only aggregates computed from it
@@ -464,51 +476,109 @@ def population_spending_by_category(
     if start_date > end_date:
         raise ValueError("start_date cannot be after end_date")
 
-    # One row per customer with its categories packed into JSON: 5,100 rows
-    # instead of ~50,000 customer-category rows, which halves the transfer.
+    # The basket rules arrive as a lookup table generated from
+    # coach/spending_baskets.py, so SQL holds no copy of them. A purchase's
+    # key is category|mcc|L or S (large or not); an MCC missing from the table
+    # falls back to the key without one, as classify_purchase does.
+    # Results are packed into JSON, one row per customer, to keep the
+    # transfer small.
     query = """
-        WITH spending AS (
+        WITH lookup AS (
+            SELECT key, value AS basket FROM jsonb_each_text(%(lookup)s::jsonb)
+        ),
+        thresholds AS (
+            SELECT key AS category, value::numeric AS large_from
+            FROM jsonb_each_text(%(thresholds)s::jsonb)
+        ),
+        grouped AS (
+            -- Add up first, classify after: every purchase with the same
+            -- customer, category, MCC and size lands in the same basket, and
+            -- ~200k groups fit the server's small work_mem where 1.7M
+            -- individual purchases spilled to disk (20 s instead of 7 s).
             SELECT
-                customer_id,
-                COALESCE(category, 'Uncategorized') AS category,
-                SUM(-tx_amount_eur) AS total_eur
-            FROM transactions
-            WHERE tx_date >= %s
-              AND tx_date <= %s
-              AND tx_amount_eur < 0
-              AND transaction_type = ANY(%s)
-            GROUP BY 1, 2
+                t.customer_id,
+                COALESCE(t.category, 'Uncategorized') AS category,
+                COALESCE(t.mcc_code, '') AS mcc_code,
+                CASE WHEN -t.tx_amount_eur >= th.large_from THEN 'L' ELSE 'S' END AS size,
+                SUM(-t.tx_amount_eur) AS amount_eur
+            FROM transactions AS t
+            LEFT JOIN thresholds AS th ON th.category = t.category
+            WHERE t.tx_date >= %(start)s
+              AND t.tx_date <= %(end)s
+              AND t.tx_amount_eur < 0
+              AND t.transaction_type = ANY(%(types)s)
+            GROUP BY 1, 2, 3, 4
+        ),
+        classified AS (
+            SELECT
+                g.customer_id,
+                g.category,
+                g.amount_eur,
+                COALESCE(exact.basket, no_mcc.basket, any_category.basket, %(unclassified)s) AS basket
+            FROM grouped AS g
+            LEFT JOIN lookup AS exact
+                ON exact.key = g.category || '|' || g.mcc_code || '|' || g.size
+            LEFT JOIN lookup AS no_mcc
+                ON no_mcc.key = g.category || '||' || g.size
+            LEFT JOIN lookup AS any_category
+                ON any_category.key = %(any_category)s || '|' || g.mcc_code || '|' || g.size
+        ),
+        by_category AS (
+            SELECT customer_id, jsonb_object_agg(category, total) AS spending
+            FROM (
+                SELECT customer_id, category, ROUND(SUM(amount_eur), 2) AS total
+                FROM classified GROUP BY 1, 2
+            ) AS t
+            GROUP BY customer_id
+        ),
+        by_basket AS (
+            SELECT customer_id, jsonb_object_agg(basket, total) AS baskets
+            FROM (
+                SELECT customer_id, basket, ROUND(SUM(amount_eur), 2) AS total
+                FROM classified GROUP BY 1, 2
+            ) AS t
+            GROUP BY customer_id
         )
         SELECT
             c.customer_id,
             c.age,
-            COALESCE(
-                jsonb_object_agg(s.category, ROUND(s.total_eur, 2))
-                    FILTER (WHERE s.category IS NOT NULL),
-                '{}'::jsonb
-            ) AS spending
+            COALESCE(bc.spending, '{}'::jsonb) AS spending,
+            COALESCE(bb.baskets, '{}'::jsonb) AS baskets
         FROM customers AS c
-        LEFT JOIN spending AS s USING (customer_id)
-        GROUP BY c.customer_id, c.age
+        LEFT JOIN by_category AS bc USING (customer_id)
+        LEFT JOIN by_basket AS bb USING (customer_id)
         ORDER BY c.customer_id;
     """
+    params = {
+        "start": start_date,
+        "end": end_date,
+        "types": CONSUMPTION_TRANSACTION_TYPES,
+        "lookup": json.dumps(basket_lookup()),
+        "thresholds": json.dumps(
+            {k: str(v) for k, v in large_purchase_thresholds().items()}
+        ),
+        "unclassified": UNCLASSIFIED,
+        "any_category": ANY_CATEGORY,
+    }
 
     with get_connection() as conn:
-        with conn.cursor() as cur:
-            cur.execute(
-                query,
-                (start_date, end_date, CONSUMPTION_TRANSACTION_TYPES),
-            )
+        # Aiven's default work_mem (2 MB) makes the grouping sort spill to
+        # disk: ~17 s instead of ~8 s. SET LOCAL raises it for this one
+        # transaction only; the session and the server keep their settings.
+        with conn.transaction(), conn.cursor() as cur:
+            cur.execute(f"SET LOCAL work_mem = '{POPULATION_WORK_MEM}'")
+            cur.execute(query, params)
             rows = cur.fetchall()
+
+    def floats(totals):
+        return {key: round(float(total), 2) for key, total in totals.items()}
 
     return tuple(
         {
             "customer_id": row["customer_id"],
             "age": row["age"],
-            "spending": {
-                category: round(float(total), 2)
-                for category, total in row["spending"].items()
-            },
+            "spending": floats(row["spending"]),
+            "baskets": floats(row["baskets"]),
         }
         for row in rows
     )

@@ -66,6 +66,8 @@ people aged 18–24"); for below_peers use spends_less_than_pct_of_peers ("you s
 your age"). Report these numbers as given; never subtract them yourself. \
 Name the age group and the period. Describe habits kindly and without judging; spending less is not always better. \
 Rent and utilities are left out of the profile because they reflect living situation; mention them only if asked. \
+by_basket compares the three baskets; use it for "do I spend more on everyday things than others?" and to round off a \
+profile with the ☕ everyday basket. Remember 🏠 includes rent, so a low 🏠 basket is not a habit. \
 Spending less than peers does not mean the customer has money to spare: before suggesting they have room to spend, \
 save or treat themselves, call get_safe_to_spend and base the suggestion on it.
 - Salary, other income, salary sweeps and investments are money movements, not spending. They are never in the baskets.
@@ -407,7 +409,8 @@ def load_tools(customer_id, today=None):
                 "How the customer's spending compares with people their age (Statistics Finland age bands) "
                 "and with all customers, over the last 12 complete months. Per category and in total: "
                 "my_monthly, the peer median and typical range, difference_from_median_pct, "
-                "spends_more_than_pct_of_peers and a level (above_peers, typical, below_peers). profile lists "
+                "spends_more_than_pct_of_peers and a level (above_peers, typical, below_peers). by_basket gives the "
+                "same for S-Bank's three baskets (placed as in get_basket_summary). profile lists "
                 "the habits that stand out against the age group, largest first; rent and utilities are left "
                 "out of it. Only aggregates; no other customer's data. Everything is computed; just explain it."
             ),

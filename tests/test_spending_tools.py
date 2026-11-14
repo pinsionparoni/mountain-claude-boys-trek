@@ -400,9 +400,11 @@ def test_peer_period_is_the_last_12_complete_months(today, start, end):
 
 def _population():
     me = {"customer_id": "CUST00001", "age": 22,
-          "spending": {"Restaurants": 3600, "Housing": 1200}}
+          "spending": {"Restaurants": 3600, "Housing": 1200},
+          "baskets": {"everyday_spending": 3600, "regular_essentials": 1200}}
     others = [{"customer_id": f"CUST1{i:04d}", "age": 21,
-               "spending": {"Restaurants": 1200, "Housing": 12000}} for i in range(40)]
+               "spending": {"Restaurants": 1200, "Housing": 12000},
+               "baskets": {"everyday_spending": 1200, "regular_essentials": 12000}} for i in range(40)]
     return (me, *others)
 
 
@@ -413,7 +415,7 @@ def test_compare_with_peers_tool_takes_no_arguments_and_uses_today(monkeypatch):
         asked.append((start, end))
         return _population()
 
-    monkeypatch.setattr(queries, "population_spending_by_category", fake_population)
+    monkeypatch.setattr(queries, "population_spending", fake_population)
     tool = {t.name: t for t in spending.load_tools("CUST00001", date(2026, 9, 10))}["compare_with_peers"]
 
     with pytest.raises(ValueError, match="unexpected"):
@@ -430,16 +432,23 @@ def test_compare_with_peers_tool_takes_no_arguments_and_uses_today(monkeypatch):
     assert result["by_category"]["Housing"]["age_group"]["level"] == "below_peers"
     assert result["profile"]["below_peers"] == []
     assert result["not_in_profile"] == ["Housing", "Utilities"]
+    # Baskets are compared the same way, with S-Bank's names.
+    everyday = result["by_basket"]["everyday_spending"]
+    assert everyday["label"] == "☕ Everyday spending"
+    assert everyday["label_fi"] == "☕ Arjen kulutus"
+    assert everyday["my_monthly"] == 300.0
+    assert everyday["age_group"]["peer_median_monthly"] == 100.0
+    assert result["by_basket"]["regular_essentials"]["age_group"]["level"] == "below_peers"
 
 
 def test_compare_with_peers_returns_no_other_customer_ids(monkeypatch):
-    monkeypatch.setattr(queries, "population_spending_by_category", lambda s, e: _population())
+    monkeypatch.setattr(queries, "population_spending", lambda s, e: _population())
     tool = {t.name: t for t in spending.load_tools("CUST00001", date(2026, 9, 10))}["compare_with_peers"]
     assert "CUST1" not in tool.run({})
 
 
 def test_compare_with_peers_unknown_customer(monkeypatch):
-    monkeypatch.setattr(queries, "population_spending_by_category", lambda s, e: _population())
+    monkeypatch.setattr(queries, "population_spending", lambda s, e: _population())
     tool = {t.name: t for t in spending.load_tools("CUST09999", date(2026, 9, 10))}["compare_with_peers"]
     with pytest.raises(ValueError, match="Unknown customer"):
         tool.run({})
