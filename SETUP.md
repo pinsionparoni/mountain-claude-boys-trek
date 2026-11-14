@@ -236,6 +236,31 @@ Demo customers (in the header's picker, chosen for `COACH_TODAY=2026-09-10`):
 
 Frontend code: `frontend/src/`. Visual design is in `styles/tokens.css` (colours, fonts, spacing) and `config/ui.config.ts` (optional sections on/off); all UI text in both languages is in `lib/i18n.ts`. Check with `npm run build` and `npm run lint`.
 
+## 11. Open it on your phone
+
+A phone can't reach `localhost` on your laptop (and WSL adds another network layer), so a [Cloudflare quick tunnel](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/do-more-with-tunnels/trycloudflare/) gives the frontend dev server a temporary public HTTPS address. No Cloudflare account is needed; it works on Android and iPhone, over Wi-Fi or mobile data, and code changes still reload live.
+
+Install `cloudflared` once (no sudo; check the SHA-256 against the one listed in the [release notes](https://github.com/cloudflare/cloudflared/releases)):
+
+```bash
+mkdir -p ~/.local/bin
+curl -fL -o ~/.local/bin/cloudflared \
+  https://github.com/cloudflare/cloudflared/releases/download/2026.10.7/cloudflared-linux-amd64
+chmod +x ~/.local/bin/cloudflared
+```
+
+With the backend and frontend running (step 10), in a third terminal:
+
+```bash
+~/.local/bin/cloudflared tunnel --no-autoupdate --url http://localhost:5173
+```
+
+It prints an address like `https://some-random-words.trycloudflare.com`: open that on the phone. The frontend's `/api` forwarding works through it, chat answers stream as usual, and `frontend/vite.config.ts` allows `*.trycloudflare.com` hosts.
+
+- **The address changes every time** you restart the tunnel, and stops working when you stop it (Ctrl+C) or close the laptop.
+- **Anyone with the address can use the app**, and every chat message runs Gemma on Verda (paid). Share it only with the team and stop the tunnel when you're done. For judging we'll want a hosted version instead.
+- Warnings about `ping_group_range` / ICMP are harmless: the tunnel doesn't need ping.
+
 ## Project layout
 
 The AI never touches the database directly. It calls tools; the tools use the query layer for data and the calculations module for maths.
