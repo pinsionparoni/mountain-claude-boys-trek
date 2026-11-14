@@ -11,6 +11,9 @@ interface Props {
   t: Text;
   lang: Lang;
   showSuggestions: boolean;
+  /** A question to send as soon as the coach is free (e.g. from the home screen's tip). */
+  pendingQuestion?: string | null;
+  onPendingSent?: () => void;
   children?: ReactNode;  // cards shown above the conversation
 }
 
@@ -18,7 +21,7 @@ interface Props {
 // input bar pinned to the bottom, like S-mobiili's tab bar. The composer, history and
 // status live outside ui.config: they are core behaviour.
 // Parent renders it with key={customerId}, so a new customer starts a new conversation.
-export function Chat({ customerId, t, lang, showSuggestions, children }: Props) {
+export function Chat({ customerId, t, lang, showSuggestions, pendingQuestion, onPendingSent, children }: Props) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [draft, setDraft] = useState("");
   const [status, setStatus] = useState("");
@@ -67,6 +70,15 @@ export function Chat({ customerId, t, lang, showSuggestions, children }: Props) 
       setStatus("");
     }
   };
+
+  // A question handed over from elsewhere in the app: ask it once the coach is free.
+  useEffect(() => {
+    if (pendingQuestion && !busy) {
+      onPendingSent?.();
+      void send(pendingQuestion);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- send is recreated each render
+  }, [pendingQuestion, busy]);
 
   const onSubmit = (e: FormEvent) => {
     e.preventDefault();

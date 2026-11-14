@@ -26,6 +26,8 @@ Endpoints:
 - ``GET /customers/{id}/budget``: the monthly budget and safe to spend this week.
 - ``GET /customers/{id}/receipts``: the latest card purchases up to "today",
   newest first, each with its merchant type and basket. No AI involved.
+- ``GET /customers/{id}/tip``: the home screen's money-coaching tip, picked by
+  rules from the customer's data (coach/tips.py), with a chart. No AI involved.
 - ``GET /health``: is the API up, and does it need a demo passcode.
 - ``GET /passcode``: 200 if the ``X-Demo-Passcode`` header is right (for the login screen).
 
@@ -52,7 +54,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
-from coach import agent, budget, peers
+from coach import agent, budget, peers, tips
 from coach.database import queries
 from coach.spending_baskets import BASKET_LABELS_FI
 from coach.tools.spending import DATA_END
@@ -190,3 +192,9 @@ def receipts(customer_id: str, limit: int = 30):
         raise HTTPException(400, "limit must be between 1 and 100")
     today = _today(customer_id)
     return {"today": today.isoformat(), "receipts": queries.recent_purchases(customer_id, today, limit)}
+
+
+@app.get("/customers/{customer_id}/tip", dependencies=PROTECTED)
+def tip(customer_id: str):
+    today = _today(customer_id)
+    return {"today": today.isoformat(), **tips.pick(customer_id, today)}

@@ -1,7 +1,14 @@
 // All UI text in English and Finnish. Numbers and basket names come from the backend;
 // the coach itself answers in the language the question is written in.
 
+import { formatMoney } from "./money";
+import type { TipFacts } from "./types";
+
 export type Lang = "en" | "fi";
+
+// Helpers for the texts that carry figures (money and short dates).
+const m = (eur: number) => formatMoney(eur);
+const d = (iso: string, lang: Lang) => formatDay(iso, lang, { day: "numeric", month: "numeric" });
 
 export const locales: Record<Lang, string> = { en: "en-GB", fi: "fi-FI" };
 
@@ -48,6 +55,43 @@ export const text = {
       sTili: "S-Tili",
       visaDebit: "S-Etukortti Visa Debit online",
       receipts: "Receipts",
+      // Money-coaching tip on the home screen (coach/tips.py picks it; figures from the backend)
+      coachingTitle: "Money adviser",
+      askMore: "Ask more",
+      tip: {
+        cash_tight: {
+          title: "Cash is tight until payday",
+          body: (f: TipFacts) => `You can safely spend ${m(f.safe_this_week)} this week: your balance has to last until payday on ${d(f.next_payday, "en")}.`,
+          question: "How do I get by until payday?",
+        },
+        over_budget: {
+          title: "Over your everyday budget",
+          body: (f: TipFacts) => `Your everyday spending is ${m(f.over)} over this month's budget of ${m(f.everyday_budget)}.`,
+          question: "How do I get back on budget?",
+        },
+        above_finland: {
+          Restaurants: {
+            title: "Restaurants: room to save?",
+            body: (f: TipFacts) => `You spend ${m(f.my_monthly)} a month eating out, ${f.difference_pct}% more than the Finnish average for people aged ${f.age_group} (${m(f.finland_monthly)}, Statistics Finland). Cutting ${f.cut_pct}% would save ${m(f.yearly_saving)} a year.`,
+            question: "How could I spend less on restaurants?",
+          },
+          Entertainment: {
+            title: "Entertainment: room to save?",
+            body: (f: TipFacts) => `You spend ${m(f.my_monthly)} a month on entertainment, ${f.difference_pct}% more than the Finnish average for people aged ${f.age_group} (${m(f.finland_monthly)}, Statistics Finland). Cutting ${f.cut_pct}% would save ${m(f.yearly_saving)} a year.`,
+            question: "How could I spend less on entertainment?",
+          },
+        },
+        nearly_used: {
+          title: "Everyday budget nearly used",
+          body: (f: TipFacts) => `${m(f.remaining)} of your everyday budget is left: about ${m(f.per_week)} a week for the last ${f.days_left} days.`,
+          question: "How do I make the rest of the month's budget last?",
+        },
+        on_track: {
+          title: "You're on track",
+          body: (f: TipFacts) => `${m(f.remaining)} of your everyday budget is left this month, about ${m(f.per_week)} a week. A good moment to think about moving some of it to savings.`,
+          question: "How much could I save each month?",
+        },
+      },
       open: "Open",
       receiptsLead: "Your latest card purchases, each in its basket.",
       receiptsEmpty: "No purchases yet.",
@@ -101,7 +145,8 @@ export const text = {
     title: "Talk with your money",
     lead: "Plain answers about your spending, computed from your own transactions.",
     loading: "Loading your figures…",
-    loadError: "Couldn't load your figures. Is the backend running?",
+    loadError: "Couldn't load your figures. Check your connection.",
+    tryAgain: "Try again",
     stsTitle: "Safe to spend this week",
     overBudget: (over: string) => `You're ${over} over this month's everyday budget.`,
     left: (left: string, budget: string) => `${left} left of your ${budget} everyday budget this month.`,
@@ -217,6 +262,43 @@ export const text = {
       sTili: "S-Tili",
       visaDebit: "S-Etukortti Visa Debit online",
       receipts: "Kuitit",
+      // Talousvalmennuksen vinkki etusivulla (coach/tips.py valitsee sen; luvut taustapalvelulta)
+      coachingTitle: "Talousneuvoja",
+      askMore: "Kysy lisää",
+      tip: {
+        cash_tight: {
+          title: "Rahaa on tiukasti palkkapäivään asti",
+          body: (f: TipFacts) => `Tällä viikolla voit käyttää turvallisesti ${m(f.safe_this_week)}, sillä tilin saldon pitää riittää palkkapäivään ${d(f.next_payday, "fi")} asti.`,
+          question: "Miten pärjään palkkapäivään asti?",
+        },
+        over_budget: {
+          title: "Arjen budjetti on ylittynyt",
+          body: (f: TipFacts) => `Arjen kulutuksesi on tässä kuussa ${m(f.over)} yli budjetin (${m(f.everyday_budget)}).`,
+          question: "Miten pääsen takaisin budjettiin?",
+        },
+        above_finland: {
+          Restaurants: {
+            title: "Ravintolat: säästön paikka?",
+            body: (f: TipFacts) => `Käytät ravintoloihin ${m(f.my_monthly)} kuukaudessa, ${f.difference_pct} % enemmän kuin ${f.age_group}-vuotiaat Suomessa keskimäärin (${m(f.finland_monthly)}, Tilastokeskus). ${f.cut_pct} %:n vähennys säästäisi ${m(f.yearly_saving)} vuodessa.`,
+            question: "Miten voisin vähentää ravintolakulujani?",
+          },
+          Entertainment: {
+            title: "Viihde: säästön paikka?",
+            body: (f: TipFacts) => `Käytät viihteeseen ${m(f.my_monthly)} kuukaudessa, ${f.difference_pct} % enemmän kuin ${f.age_group}-vuotiaat Suomessa keskimäärin (${m(f.finland_monthly)}, Tilastokeskus). ${f.cut_pct} %:n vähennys säästäisi ${m(f.yearly_saving)} vuodessa.`,
+            question: "Miten voisin vähentää viihdemenojani?",
+          },
+        },
+        nearly_used: {
+          title: "Arjen budjetti on lähes käytetty",
+          body: (f: TipFacts) => `Arjen budjettia on jäljellä ${m(f.remaining)}, eli noin ${m(f.per_week)} viikossa loppukuun ${f.days_left} päivälle.`,
+          question: "Miten saan loppukuun budjetin riittämään?",
+        },
+        on_track: {
+          title: "Hyvin menee!",
+          body: (f: TipFacts) => `Arjen budjettia on tässä kuussa jäljellä ${m(f.remaining)}, noin ${m(f.per_week)} viikossa. Hyvä hetki miettiä, voisiko osan siirtää säästöön.`,
+          question: "Paljonko voisin säästää kuukaudessa?",
+        },
+      },
       open: "Avaa",
       receiptsLead: "Viimeisimmät korttiostoksesi koreittain.",
       receiptsEmpty: "Ei vielä ostoksia.",
@@ -266,7 +348,8 @@ export const text = {
     title: "Juttele rahojesi kanssa",
     lead: "Selkeät vastaukset kulutuksestasi, laskettuna omista tilitapahtumistasi.",
     loading: "Haetaan lukujasi…",
-    loadError: "Lukujen haku epäonnistui. Onko taustapalvelu käynnissä?",
+    loadError: "Lukujen haku epäonnistui. Tarkista verkkoyhteys.",
+    tryAgain: "Yritä uudelleen",
     stsTitle: "Turvallisesti käytettävissä tällä viikolla",
     overBudget: (over: string) => `Olet ${over} yli tämän kuun arjen kulutuksen budjetin.`,
     left: (left: string, budget: string) => `${left} jäljellä tämän kuun ${budget} arjen kulutuksen budjetista.`,

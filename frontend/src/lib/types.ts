@@ -95,6 +95,34 @@ export interface PeerGroup {
   spends_less_than_pct: number;
 }
 
+/** The figures behind a home-screen tip (coach/tips.py); which ones depends on the kind. */
+export interface TipFacts {
+  safe_this_week: number;
+  next_payday: string;
+  days_to_payday: number;
+  over: number;
+  everyday_budget: number;
+  category: "Restaurants" | "Entertainment";
+  age_group: string;
+  my_monthly: number;
+  finland_monthly: number;
+  difference_pct: number;
+  cut_pct: number;
+  yearly_saving: number;
+  remaining: number;
+  per_week: number;
+  days_left: number;
+  savings_per_month: number;
+}
+
+/** GET /customers/{id}/tip: one money-coaching tip for the home screen. */
+export interface Tip {
+  today: string;
+  kind: "cash_tight" | "over_budget" | "above_finland" | "nearly_used" | "on_track";
+  facts: TipFacts;
+  chart: ChartSpec;
+}
+
 export interface ChatMessage {
   id: string;
   author: "user" | "assistant";
