@@ -166,3 +166,19 @@ def test_check_mode_writes_report_and_review_sheet(tmp_path):
     sheet = (tmp_path / "out" / "review.csv").read_text(encoding="utf-8-sig")
     assert sheet.splitlines()[0] == "id,customer_id,question,answer,issues,corrected_answer,notes"
     assert "anglicism: Hyvissä railseissa." in sheet
+
+
+# Added with the coach test set (evals/coach): false alarms seen on real Gemma answers.
+@pytest.mark.parametrize("text", [
+    "Ota yhteyttä Peluuriin, joka tarjoaa maksutonta apua.",
+    "Voit soittaa MIELI ry:n Kriisipuhelimeen.",
+    "Kannattaa tutustua Verohallinnon ohjeisiin.",
+    "Käytit baareihin yhteensä 72,89 € elokuussa 2026. Nämä menot ovat arjen kulutusta.",
+])
+def test_names_and_sentences_after_a_year_are_not_flagged(text):
+    assert not [i for i in check_answer(text) if i.code == "capital_mid_sentence"]
+
+
+def test_ordinal_dates_still_continue_the_sentence():
+    issues = check_answer("Palkkapäivä on 15. Syyskuuta.")
+    assert any(i.code == "capital_mid_sentence" for i in issues)

@@ -6,3 +6,6 @@ __pycache__/
 
 # Finnish language check runs (evals/finnish/run.py)
 /evals/finnish/results/
+
+# Coach test-set runs (evals/coach/run.py)
+/evals/coach/results/

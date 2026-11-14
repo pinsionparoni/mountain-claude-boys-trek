@@ -57,6 +57,8 @@ ALLOWED_CAPITAL_PREFIXES = (
     "S-Pank", "S-mobiil", "S-Etukort", "Etukort", "S-Tili", "Visa", "Mastercard",
     "Helsin", "Hel", "Espoo", "Vanta", "Suom", "Euroop", "Tilastokesk", "Kela",
     "Verda", "Gemma", "Claude", "Google", "MyData", "PSD2",
+    # Help services named in POLICY.md and organisations the coach may refer to.
+    "Peluur", "Kriisipuhel", "Takuusäät", "Velkalinj", "Verohallin", "Finanssivalvon",
 )
 
 # The first words of S-Bank's Finnish basket names. Written exactly as the
@@ -70,8 +72,9 @@ _BASKET_NAME = re.compile("(?:" + "|".join(map(re.escape, _BASKET_NAMES)) + r")(
 _WORD = re.compile(r"[^\W\d_][\w-]*", re.UNICODE)
 # Line starts: list bullets, numbered items, headings, quotes.
 _LINE_PREFIX = re.compile(r"^\s*(?:[-*•+]\s+|\d+[.)]\s+|#+\s+|>\s*)*")
-# End of a sentence: . ! ? … not after a digit (dates, ordinals: 15. syyskuuta).
-_SENTENCE_END = re.compile(r"(?<!\d)[.!?…]+[\"'”»)*_]*\s+")
+# End of a sentence: . ! ? … not after a digit (dates, ordinals: 15. syyskuuta),
+# except after a four-digit year ("…elokuussa 2026. Nämä menot…").
+_SENTENCE_END = re.compile(r"(?:(?<!\d)|(?<=(?<!\d)\d{4}))[.!?…]+[\"'”»)*_]*\s+")
 
 
 def _is_allowed_capital(word):

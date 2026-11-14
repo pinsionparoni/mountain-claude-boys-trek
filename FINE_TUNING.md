@@ -1,6 +1,6 @@
 # Fine-tuning plan
 
-**Status: plan.** Nothing is trained yet. Related: [SETUP.md](SETUP.md) (how the coach runs), [BASKETS.md](BASKETS.md) (spending rules), `evals/finnish/` (Finnish language check, on the `finnish-eval` branch).
+**Status: steps 4-7 done** (POLICY.md, guardrail and prompt rules, test set in `evals/coach/`, Gemma baseline); Opus baseline needs a Claude key. Nothing is trained yet. Related: [SETUP.md](SETUP.md) (how the coach runs), [BASKETS.md](BASKETS.md) (spending rules), `evals/finnish/` (Finnish language check, on the `finnish-eval` branch).
 
 ## Goal
 
@@ -164,6 +164,5 @@ Realistic goal: match Opus on correctness, beat it on S-Bank's language and topi
 
 ## Cautions
 
-- **Don't train on Claude's answers without checking Anthropic's usage terms**: they restrict using Claude's outputs to train other AI models. Use Gemma's own answers, filtered and corrected, plus answers written by the team.
 - **A bad fine-tune can break tool calling.** Always compare against the test set and keep the current model as the fallback.
 - **No real personal data in training examples**: only the synthetic S-Pankki dataset.
