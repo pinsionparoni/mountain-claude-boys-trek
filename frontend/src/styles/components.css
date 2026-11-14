@@ -999,7 +999,7 @@ html, body, #root { block-size: 100%; overflow: hidden; }
 .meter-fill { display: block; block-size: 100%; border-radius: inherit; background: var(--chart-series); transition: inline-size var(--sp-duration-slow) var(--sp-ease-entry); }
 .meter.is-over .meter-fill { background: var(--sp-error-text); }
 
-/* One category against others: typical range (band), median (tick), you (dot). */
+/* One category against others: median (tick), Finnish average (diamond), you (dot). */
 .ranges { display: grid; gap: var(--sp-space-4); }
 .range { display: grid; gap: 6px; font-size: 0.85rem; }
 .range-label { color: var(--sp-neutral-stronger); }
@@ -1012,7 +1012,6 @@ html, body, #root { block-size: 100%; overflow: hidden; }
   block-size: 1px;
   background: var(--sp-border-subtle);
 }
-.range-band { position: absolute; inset-block: 3px; border-radius: 4px; background: rgb(138 145 141 / 0.28); }
 .range-median { position: absolute; inset-block: 0; inline-size: 2px; margin-inline-start: -1px; border-radius: 1px; background: var(--chart-peer); }
 .range-me {
   position: absolute;
@@ -1028,7 +1027,6 @@ html, body, #root { block-size: 100%; overflow: hidden; }
 .range-figures span:first-child { color: var(--sp-neutral-strongest); }
 .swatch--dot { inline-size: 10px; block-size: 10px; border-radius: 50%; background: var(--chart-series); }
 .swatch--tick { inline-size: 2px; block-size: 12px; border-radius: 1px; background: var(--chart-peer); }
-.swatch--band { background: rgb(138 145 141 / 0.28); }
 
 /* Statistics Finland's average: a small dark diamond, a shape of its own so it
    never reads as the customer's dot or the peers' median tick. */

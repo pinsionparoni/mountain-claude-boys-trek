@@ -453,8 +453,8 @@ def load_tools(customer_id, today=None):
                 "one category, one basket or everything; the last month is this month so far), 'balance' (end-of-month "
                 "balance), 'budget' (each basket this month against the monthly budget), 'peers' (monthly spending per "
                 "category against the median of people their age; rent and utilities left out; with a category, that "
-                "one category in detail: the customer's monthly amount against the typical range and median of people "
-                "their age and of everyone). One chart per answer."
+                "one category in detail: the customer's monthly amount against the median of people their age and of "
+                "everyone, and Statistics Finland's average where it exists). One chart per answer."
             ),
             properties={
                 "kind": {"type": "string", "enum": list(charts.KINDS)},

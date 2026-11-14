@@ -138,14 +138,14 @@ export function ChatChart({ chart, t, lang }: Props) {
   }
 
   if (chart.type === "peer_range") {
-    // One category: a strip per group with the typical range (middle half) as a band,
-    // the median as a tick and the customer as a green dot. One shared scale.
+    // One category: a strip per group with the median as a tick, Statistics Finland's
+    // average as a diamond and the customer as a green dot. One shared scale.
     const groups = [
       { key: "age", label: c.ageRow(chart.age_group), g: chart.age },
       { key: "everyone", label: c.everyoneRow, g: chart.everyone },
     ];
     const finland = { age: chart.finland?.age ?? null, everyone: chart.finland?.all ?? null } as Record<string, number | null>;
-    const max = Math.max(chart.me, ...groups.flatMap(({ g }) => [g.typical_high, g.median]),
+    const max = Math.max(chart.me, ...groups.map(({ g }) => g.median),
                          ...Object.values(finland).map((v) => v ?? 0)) * 1.08 || 1;
     const at = (v: number) => `${Math.min(v / max, 1) * 100}%`;
     const what = categoryName(chart.category, lang);
@@ -157,7 +157,6 @@ export function ChatChart({ chart, t, lang }: Props) {
                <p className="chart-legend">
                  <span><i className="swatch swatch--dot" />{c.you}</span>
                  <span><i className="swatch swatch--tick" />{c.medianMark}</span>
-                 <span><i className="swatch swatch--band" />{c.typicalRange}</span>
                  {chart.finland && <span><i className="swatch swatch--finland" />{c.finlandMark}</span>}
                </p>
              }
@@ -165,7 +164,6 @@ export function ChatChart({ chart, t, lang }: Props) {
                { label: c.you, value: formatMoney(chart.me) },
                ...groups.flatMap(({ key, label, g }) => [
                  { label: `${label}: ${c.medianMark}`, value: formatMoney(g.median) },
-                 { label: `${label}: ${c.typicalRange}`, value: `${formatMoney(g.typical_low)}–${formatMoney(g.typical_high)}` },
                  ...(finland[key] !== null ? [{ label: `${label}: ${c.finlandMark}`, value: formatMoney(finland[key]!) }] : []),
                ]),
              ]}>
@@ -174,8 +172,7 @@ export function ChatChart({ chart, t, lang }: Props) {
             <div key={key} className="range">
               <span className="range-label">{label}</span>
               <span className="range-track"
-                    title={`${c.typicalRange}: ${formatMoney(g.typical_low)}–${formatMoney(g.typical_high)} · ${c.medianMark}: ${formatMoney(g.median)}`}>
-                <span className="range-band" style={{ insetInlineStart: at(g.typical_low), inlineSize: `calc(${at(g.typical_high)} - ${at(g.typical_low)})` }} />
+                    title={`${c.medianMark}: ${formatMoney(g.median)}`}>
                 <span className="range-median" style={{ insetInlineStart: at(g.median) }} />
                 {finland[key] !== null && (
                   <span className="mark-finland" style={{ insetInlineStart: at(finland[key]!) }}

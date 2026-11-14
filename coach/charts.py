@@ -11,8 +11,9 @@ Sums are done here (Decimal, rounded to cents at the end), never by the model.
 - ``balance``: the account balance at the end of each month
 - ``budget``: each basket this month against what the monthly budget expects
 - ``peers``: the customer's monthly spending per category against people their age;
-  with a category, ``peer_range``: that one category against the typical range
-  and median of people their age and of everyone
+  with a category, ``peer_range``: that one category against the median of
+  people their age and of everyone (the typical range is included for the
+  coach's text; the app draws medians and Statistics Finland's average)
 """
 
 from collections import OrderedDict
