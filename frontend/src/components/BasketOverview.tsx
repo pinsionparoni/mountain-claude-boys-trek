@@ -1,3 +1,4 @@
+import type { Lang, Text } from "../lib/i18n";
 import type { BasketKey, BasketSummary } from "../lib/types";
 import { formatMoney } from "../lib/money";
 
@@ -12,20 +13,22 @@ interface Props {
   summary: BasketSummary;
   periodLabel: string;
   showBars: boolean;
+  t: Text;
+  lang: Lang;
 }
 
-export function BasketOverview({ summary, periodLabel, showBars }: Props) {
+export function BasketOverview({ summary, periodLabel, showBars, t, lang }: Props) {
   return (
     <section className="panel" aria-labelledby="baskets-title">
-      <h2 id="baskets-title" className="panel-title">Your spending baskets</h2>
-      <p className="muted">{periodLabel} · {formatMoney(summary.total_spending_eur)} in total</p>
+      <h2 id="baskets-title" className="panel-title">{t.basketsTitle}</h2>
+      <p className="muted">{periodLabel} · {t.inTotal(formatMoney(summary.total_spending_eur))}</p>
       <ul className="basket-list">
         {ORDER.map((key) => {
           const b = summary.baskets[key];
           return (
             <li key={key} className={`basket basket--${CSS_NAME[key]}`}>
               <div className="basket-row">
-                <span className="basket-label">{b.label}</span>
+                <span className="basket-label">{lang === "fi" ? b.label_fi : b.label}</span>
                 <span className="money basket-amount">{formatMoney(b.total_eur)}</span>
               </div>
               {showBars && (
@@ -34,7 +37,7 @@ export function BasketOverview({ summary, periodLabel, showBars }: Props) {
                 </div>
               )}
               <p className="basket-meta muted">
-                {b.share_pct.toLocaleString("fi-FI")} % · {b.transaction_count} purchases
+                {b.share_pct.toLocaleString("fi-FI")} % · {t.purchases(b.transaction_count)}
               </p>
             </li>
           );

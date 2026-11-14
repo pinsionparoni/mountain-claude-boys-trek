@@ -209,6 +209,33 @@ Unit tests need no database or model: a fake connection stands in for PostgreSQL
 
 `COACH_TODAY` and `COACH_MODEL` apply to the API too. Conversations are kept in memory (a restart forgets them), and there is no login: fine for the demo, not for real customers.
 
+## 10. Run the whole app (backend + frontend)
+
+Needs Node.js 20+ for the frontend (`node --version`).
+
+```bash
+# Terminal 1: backend on http://localhost:8000
+COACH_TODAY=2026-09-10 .venv/bin/uvicorn coach.api:app --reload
+
+# Terminal 2: frontend on http://localhost:5173
+cd frontend
+npm install        # first time, and after package.json changes
+npm run dev
+```
+
+Open http://localhost:5173 (on WSL, the Windows browser reaches it as localhost too). `?lang=fi` opens it in Finnish. The frontend forwards `/api/...` to the backend (`frontend/vite.config.ts`), so start the backend first. Make sure Verda's Min replicas is 1 (see step 5) or the chat waits for Gemma to start.
+
+Demo customers (in the header's picker, chosen for `COACH_TODAY=2026-09-10`):
+
+| Customer | Situation |
+|---|---|
+| CUST00226 (21) | Budget left, but cash is tight before payday: the coach says €68.23 this week, limited by cash |
+| CUST00050 (23) | On track, about €203 a week |
+| CUST00127 (24) | Everyday budget nearly used, about €59 a week |
+| CUST00001 (63) | Older customer, for contrast |
+
+Frontend code: `frontend/src/`. Visual design is in `styles/tokens.css` (colours, fonts, spacing) and `config/ui.config.ts` (optional sections on/off); all UI text in both languages is in `lib/i18n.ts`. Check with `npm run build` and `npm run lint`.
+
 ## Project layout
 
 The AI never touches the database directly. It calls tools; the tools use the query layer for data and the calculations module for maths.
@@ -234,6 +261,7 @@ flowchart LR
 | `coach/calculations.py` | Budget, safe-to-spend, safe-to-save and what-if maths: plain Python, no database or model |
 | `coach/web_search.py` | Optional Exa tools, only loaded when `COACH_WEB_SEARCH=1` |
 | `coach/__main__.py` | Terminal chat: `python -m coach --customer CUST00001` |
+| `frontend/` | React + Vite mobile web app (see step 10) |
 | `scripts/load_data.py` | Loads `data/*.csv` into PostgreSQL (`DATABASE_URL`) |
 | `scripts/profile_data.py` | Regenerates [DATA.md](DATA.md) from the CSVs |
 | `scripts/audits/` | One-off data audits against the live database |

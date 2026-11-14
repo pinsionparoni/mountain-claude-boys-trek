@@ -213,3 +213,60 @@ h1, h2, p { margin: 0; }
 .button--primary { background: var(--sp-button-primary-bg); color: var(--sp-button-primary-text); }
 .button--primary:hover { background: var(--sp-button-primary-bg-hover); }
 .button--primary:active { background: var(--sp-button-primary-bg-active); }
+
+/* Customer picker (demo only) */
+.customer-picker select {
+  min-block-size: var(--sp-control-min-height);
+  padding-inline: var(--sp-space-3);
+  border-radius: var(--sp-radius-input);
+  border: var(--sp-control-border-width) solid var(--sp-border-default);
+  background: var(--sp-white);
+  color: var(--sp-text);
+  font: inherit;
+  font-size: var(--sp-font-size-small);
+  max-inline-size: 100%;
+}
+
+/* Notices */
+.notice {
+  padding: var(--sp-space-3) var(--sp-space-4);
+  border-radius: var(--sp-radius-input);
+  border: 1px solid;
+}
+.notice--warning { color: var(--sp-warning-text); background: var(--sp-warning-bg); border-color: var(--sp-warning-border); }
+.notice--error { color: var(--sp-error-text); background: var(--sp-error-bg); border-color: var(--sp-error-border); }
+
+/* Coach answers: light Markdown rendered by formatAnswer */
+.answer { display: grid; gap: var(--sp-space-2); }
+.answer ul { margin: 0; padding-inline-start: var(--sp-space-6); display: grid; gap: var(--sp-space-1); }
+.answer strong { font-weight: var(--sp-weight-bold); }
+
+.chat-status { font-size: var(--sp-font-size-small); padding-inline: var(--sp-space-4); }
+
+.button:disabled, .chip:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* Mobile fixes: grid columns and flex items must be able to shrink below their
+   content's natural width, or the page grows wider than the phone screen. */
+.panel { grid-template-columns: minmax(0, 1fr); }
+.composer-input { min-inline-size: 0; }
+.customer-picker { flex: 1 1 16rem; min-inline-size: 0; }
+.customer-picker select { inline-size: 100%; }
+
+@media (max-width: 480px) {
+  .panel { padding: var(--sp-space-4); }
+}
+
+/* Language switch */
+.lang-switch { display: inline-flex; border: 1px solid var(--sp-green-strong); border-radius: var(--sp-radius-pill); overflow: hidden; }
+.lang-switch button {
+  min-block-size: 40px;
+  min-inline-size: 48px;
+  border: 0;
+  background: var(--sp-white);
+  color: var(--sp-green-strongest);
+  font: inherit;
+  font-size: var(--sp-font-size-small);
+  font-weight: var(--sp-weight-bold);
+  cursor: pointer;
+}
+.lang-switch button[aria-pressed="true"] { background: var(--sp-button-primary-bg); }

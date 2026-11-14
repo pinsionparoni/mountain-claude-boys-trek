@@ -1,53 +1,10 @@
-// Illustrative demo numbers, not results from the dataset.
-import type { BasketSummary, ChatMessage, SafeToSpend } from "../lib/types";
+// Demo setup: which synthetic customers the team can switch between.
+// All numbers come from the backend; UI text is in src/lib/i18n.ts.
 
-export const demoBaskets: BasketSummary = {
-  total_spending_eur: 1842.6,
-  baskets: {
-    regular_essentials: {
-      label: "🏠 Regular essentials",
-      label_fi: "🏠 Välttämättömät menot",
-      total_eur: 1124.3,
-      share_pct: 61.0,
-      transaction_count: 23,
-    },
-    unexpected_necessities: {
-      label: "🔧 Unexpected necessities",
-      label_fi: "🔧 Yllättävät menot",
-      total_eur: 289.0,
-      share_pct: 15.7,
-      transaction_count: 2,
-    },
-    everyday_spending: {
-      label: "☕ Everyday spending",
-      label_fi: "☕ Arjen kulutus",
-      total_eur: 429.3,
-      share_pct: 23.3,
-      transaction_count: 31,
-    },
-  },
-};
-
-export const demoSafeToSpend: SafeToSpend = {
-  amount_eur: 312.4,
-  days_until_payday: 9,
-  period_label: "Until payday, 23 Nov",
-  explanation: "After your rent and usual bills, with a small buffer kept aside.",
-};
-
-export const demoSuggestions = [
-  "What is safe for me to spend this week?",
-  "How much did I spend on taxis last month?",
-  "What if I cut dining out by 20%?",
+// Picked with COACH_TODAY=2026-09-10 (see SETUP.md); their situation changes with the date.
+export const demoCustomers = [
+  { id: "CUST00226", en: "CUST00226 · 21 y · cash tight before payday", fi: "CUST00226 · 21 v · rahat tiukalla ennen palkkaa" },
+  { id: "CUST00050", en: "CUST00050 · 23 y · on track", fi: "CUST00050 · 23 v · budjetissa" },
+  { id: "CUST00127", en: "CUST00127 · 24 y · budget nearly used", fi: "CUST00127 · 24 v · budjetti lähes käytetty" },
+  { id: "CUST00001", en: "CUST00001 · 63 y", fi: "CUST00001 · 63 v" },
 ];
-
-export const demoConversation: ChatMessage[] = [
-  {
-    id: "m1",
-    author: "assistant",
-    text: "Hi! I can answer questions about your own spending. Ask me anything, or pick a suggestion below.",
-  },
-];
-
-export const demoReply =
-  "This is a mockup reply. Once the backend is connected, the coach answers from your transactions.";
