@@ -64,8 +64,30 @@ export interface Receipts {
   receipts: Receipt[];
 }
 
+/** A chart the coach chose to show (coach/charts.py); every number computed by the backend. */
+export type ChartSpec =
+  | { type: "categories"; period: { start_date: string; end_date: string };
+      items: { category: string; value: number }[]; total: number }
+  | { type: "trend"; subject: { category: string | null; basket: BasketKey | null };
+      months: { month: string; value: number; partial: boolean }[]; today: string }
+  | { type: "balance"; points: { month: string; value: number }[]; today: string }
+  | { type: "budget"; today: string; baskets: { basket: BasketKey; spent: number; reference: number }[] }
+  | { type: "peers"; age_group: string; period: { start_date: string; end_date: string };
+      items: { category: string; me: number; peer_median: number }[]; left_out: string[] }
+  | { type: "peer_range"; category: string; age_group: string; period: { start_date: string; end_date: string };
+      me: number; age: PeerGroup; everyone: PeerGroup };
+
+export interface PeerGroup {
+  median: number;
+  typical_low: number;    // 25th percentile
+  typical_high: number;   // 75th percentile
+  spends_more_than_pct: number;
+  spends_less_than_pct: number;
+}
+
 export interface ChatMessage {
   id: string;
   author: "user" | "assistant";
   text: string;
+  charts?: ChartSpec[];
 }

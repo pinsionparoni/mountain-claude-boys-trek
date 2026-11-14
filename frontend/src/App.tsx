@@ -156,7 +156,7 @@ export default function App() {
                   <h1 className="sm-header-title">{t.appName}</h1>
                   <span />
                 </header>
-                <Chat key={customerId} customerId={customerId} t={t} showSuggestions={uiConfig.showSuggestionChips}>
+                <Chat key={customerId} customerId={customerId} t={t} lang={lang} showSuggestions={uiConfig.showSuggestionChips}>
                   {!error && !budget && <p className="panel muted">{t.loading}</p>}
                   <CardCarousel t={t}>
                     {budget && <SafeToSpendCard budget={budget} t={t} lang={lang} />}

@@ -14,6 +14,8 @@ Endpoints:
   - ``tool``: ``{"name": "get_safe_to_spend"}`` while the coach looks something up,
     so the app can show "checking your spending…".
   - ``text``: ``{"text": "..."}``, a piece of the answer; append them in order.
+  - ``chart``: a chart spec (coach/charts.py) to draw with the answer: the model
+    chose it, every number in it was computed from the customer's data.
   - ``guardrail``: ``{"label": "care" | "refuse"}`` when the question got a fixed reply
     instead of the coach (see POLICY.md).
   - ``error``: ``{"message": "..."}`` if something went wrong.
@@ -152,6 +154,8 @@ def chat(request: ChatRequest):
                     yield _event("text", {"text": value})
                 elif kind == "tool":
                     yield _event("tool", {"name": value})
+                elif kind == "chart":
+                    yield _event("chart", value)
                 elif kind == "guardrail":
                     yield _event("guardrail", {"label": value})
         except Exception as e:  # the stream has started, so report errors in it

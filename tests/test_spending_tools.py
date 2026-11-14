@@ -27,6 +27,7 @@ EXPECTED_TOOLS = {
     "calculate_safe_to_save",
     "calculate_what_if",
     "compare_with_peers",
+    "show_chart",
 }
 
 Q1 = {"start_date": "2026-01-01", "end_date": "2026-03-31"}  # 90 days

@@ -5,12 +5,14 @@ The customer is fixed when the tools are created: ``load_tools(customer_id)``.
 No tool accepts a customer ID, and unexpected arguments are rejected, so the
 model can never read another customer's data, even if it tries.
 
-Eight tools:
+Nine tools:
 
 - Data (PostgreSQL): ``get_spending_by_category``, ``get_basket_summary``,
   ``get_monthly_balance_trend``, ``get_transactions``.
 - Budget (``coach/budget.py``): ``get_safe_to_spend``: the monthly budget,
   this month's progress and a cash check until payday, all computed in Python.
+- Charts (``coach/charts.py``): ``show_chart``: the model picks a chart, the
+  numbers are computed here and the app draws it next to the answer.
 - Peers (``coach/peers.py``): ``compare_with_peers``: the customer's spending
   against people their age and everyone, as medians and ranks only.
 - Calculations (plain Python, see ``coach/calculations.py``):
@@ -32,7 +34,7 @@ import json
 from datetime import date
 from decimal import Decimal
 
-from coach import budget, calculations, peers, spending_baskets
+from coach import budget, calculations, charts, peers, spending_baskets
 from coach.database import queries
 
 # First and last day of the S-Pankki dataset, from the full-table audit.
@@ -70,6 +72,13 @@ by_basket compares the three baskets; use it for "do I spend more on everyday th
 profile with the ☕ everyday basket. Remember 🏠 includes rent, so a low 🏠 basket is not a habit. \
 Spending less than peers does not mean the customer has money to spare: before suggesting they have room to spend, \
 save or treat themselves, call get_safe_to_spend and base the suggestion on it.
+- Charts: when your answer compares or shows several numbers (where money went, a change over months, the balance, \
+the budget, comparisons with people their age), also call show_chart once with the fitting kind, so the customer \
+sees it as a chart just above your answer. At most one chart per answer, none for a single number or small talk. \
+Comparing the customer with other people is always a comparison, even for one category: \
+for "how does my food spending compare to people my age?" call show_chart with kind 'peers' and that category. \
+The chart shows the numbers, so mention only the two or three that matter most in your text. \
+If the customer asks for a different view ("show it by month", "as a chart"), call show_chart again.
 - Salary, other income, salary sweeps and investments are money movements, not spending. They are never in the baskets.
 - If get_basket_summary says has_salary_sweep is true, tell the customer that their mandatory totals may be incomplete, \
 using salary_sweep_note."""
@@ -319,6 +328,32 @@ def load_tools(customer_id, today=None):
             **optional,
         )
 
+    def show_chart(args):
+        kind = args["kind"]
+        if kind not in charts.KINDS:
+            raise ValueError(f"kind must be one of: {', '.join(charts.KINDS)}")
+        months = _whole_number("months", args.get("months", 6))
+        if not 2 <= months <= 12:
+            raise ValueError("months must be between 2 and 12")
+        if kind == "categories":
+            if "start_date" in args or "end_date" in args:
+                start, end, _ = _period(args, today)
+            elif args.get("period", "this_month") == "last_month":
+                start, end = charts.last_month(today)
+            else:
+                start, end = charts.this_month(today)
+            chart = charts.categories(customer_id, start, end)
+        elif kind == "trend":
+            chart = charts.trend(customer_id, today, months, category=_category(args), basket=args.get("basket"))
+        elif kind == "balance":
+            chart = charts.balance(customer_id, today, months)
+        elif kind == "budget":
+            chart = charts.budget(customer_id, today)
+        else:
+            chart = charts.peers(customer_id, today, category=_category(args))
+        return {"chart": chart,
+                "note": "The customer now sees this chart just above your answer. Use the same numbers; don't list them all."}
+
     def peer_comparison(args):
         return peers.compare(customer_id, today)
 
@@ -402,6 +437,32 @@ def load_tools(customer_id, today=None):
             properties={},
             required=[],
             handler=safe_to_spend,
+        ),
+        CoachTool(
+            name="show_chart",
+            description=(
+                "Show the customer a small chart just above your answer, drawn from their own data. You choose what to "
+                "show; every number is computed for you and returned too. kind: 'categories' (spending per category "
+                "in a period: this month so far, last month, or start_date/end_date), 'trend' (spending per month for "
+                "one category, one basket or everything; the last month is this month so far), 'balance' (end-of-month "
+                "balance), 'budget' (each basket this month against the monthly budget), 'peers' (monthly spending per "
+                "category against the median of people their age; rent and utilities left out; with a category, that "
+                "one category in detail: the customer's monthly amount against the typical range and median of people "
+                "their age and of everyone). One chart per answer."
+            ),
+            properties={
+                "kind": {"type": "string", "enum": list(charts.KINDS)},
+                "period": {"type": "string", "enum": ["this_month", "last_month"],
+                           "description": "For kind=categories. Default this_month."},
+                **_DATE_PROPERTIES,
+                "category": _CATEGORY_PROPERTY,
+                "basket": {"type": "string", "enum": list(spending_baskets.BASKET_KEYS),
+                           "description": "For kind=trend: one basket instead of a category."},
+                "months": {"type": "integer", "minimum": 2, "maximum": 12,
+                           "description": "For kind=trend or balance: how many months, default 6."},
+            },
+            required=["kind"],
+            handler=show_chart,
         ),
         CoachTool(
             name="compare_with_peers",

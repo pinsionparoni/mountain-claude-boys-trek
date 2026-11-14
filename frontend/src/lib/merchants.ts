@@ -68,3 +68,12 @@ export function basketLabel(basket: Receipt["basket"], summary: BasketSummary | 
   if (b) return lang === "fi" ? b.label_fi : b.label;
   return { regular_essentials: "🏠", unexpected_necessities: "🔧", everyday_spending: "☕" }[basket];
 }
+
+/** S-Bank's basket names (the same as coach/spending_baskets.py BASKET_LABELS / _FI). */
+const BASKET_NAMES: Record<BasketKey, { en: string; fi: string }> = {
+  regular_essentials: { en: "🏠 Regular essentials", fi: "🏠 Välttämättömät menot" },
+  unexpected_necessities: { en: "🔧 Unexpected necessities", fi: "🔧 Yllättävät menot" },
+  everyday_spending: { en: "☕ Everyday spending", fi: "☕ Arjen kulutus" },
+};
+
+export const basketName = (basket: BasketKey, lang: Lang) => BASKET_NAMES[basket][lang];

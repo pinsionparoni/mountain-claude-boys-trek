@@ -114,6 +114,16 @@ def _run_tool(tools, name, args):
         return f"Error: {e}", True
 
 
+def _chart(name, output, is_error):
+    """The chart spec from a successful show_chart call (coach/charts.py), else None."""
+    if name != "show_chart" or is_error:
+        return None
+    try:
+        return json.loads(output)["chart"]
+    except (ValueError, KeyError, TypeError):
+        return None
+
+
 def _stream_claude(messages, system, tools):
     """Yield ("tool", name) as Claude calls tools and ("text", answer) at the end."""
     by_name = {t.name: t for t in tools}
@@ -151,6 +161,8 @@ def _stream_claude(messages, system, tools):
             if block.type == "tool_use":
                 yield "tool", block.name
                 output, is_error = _run_tool(by_name, block.name, block.input)
+                if (chart := _chart(block.name, output, is_error)) is not None:
+                    yield "chart", chart
                 results.append({"type": "tool_result", "tool_use_id": block.id,
                                 "content": output, "is_error": is_error})
         messages.append({"role": "user", "content": results})
@@ -207,7 +219,9 @@ def _stream_gemma(messages, system, tools):
             except json.JSONDecodeError:
                 output = "Error: tool arguments were not valid JSON"
             else:
-                output, _ = _run_tool(by_name, call["name"], args)
+                output, is_error = _run_tool(by_name, call["name"], args)
+                if (chart := _chart(call["name"], output, is_error)) is not None:
+                    yield "chart", chart
             messages.append({"role": "tool", "tool_call_id": call["id"], "content": output})
 
     yield "text", _too_many_steps(messages)
@@ -233,7 +247,7 @@ def _prepare(customer_id):
 
 
 def chat_stream(messages, customer_id=None):
-    """Run one user turn, yielding ("text", chunk) and ("tool", name) events as they happen.
+    """Run one user turn, yielding ("text", chunk), ("tool", name) and ("chart", spec) events as they happen.
 
     Same arguments as ``chat``. Gemma streams word by word; Claude yields its answer in
     one piece (after its tool calls). The guardrail checks the question first: for "care" and "refuse" it yields
