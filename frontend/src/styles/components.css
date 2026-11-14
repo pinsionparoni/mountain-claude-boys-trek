@@ -722,7 +722,45 @@ html, body, #root { block-size: 100%; overflow: hidden; }
 .sm-product-icon { inline-size: 30px; block-size: auto; }
 .sm-receipt-amount { font-size: 1.05rem; color: var(--sp-neutral-strongest); }
 .sm-heading-row { display: flex; align-items: baseline; justify-content: space-between; }
-.sm-heading-row .sm-link { cursor: default; }
+.sm-heading-row .sm-link { cursor: pointer; }
+
+/* Receipts: real card purchases, each marked with its basket's icon. */
+.sm-receipt-button {
+  display: block;
+  inline-size: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+  border-radius: 0 16px 16px 0;
+  transition: background-color var(--sp-duration-fast) var(--sp-ease-default);
+}
+.sm-receipt-button:hover { background: var(--sp-green-faint); }
+.sm-receipt-button:active { background: var(--sp-green-pale); }
+.sm-receipt-button .sm-row { border-block-end: 0; }
+.sm-receipt-icon {
+  display: grid;
+  place-items: center;
+  inline-size: 32px;
+  block-size: 32px;
+  border-radius: 50%;
+  background: var(--sp-green-pale);
+  font-size: 1rem;
+}
+.sm-receipt-flag {
+  justify-self: start;
+  margin-block-start: 2px;
+  padding: 1px 8px;
+  border-radius: var(--sp-radius-pill);
+  background: var(--sp-error-bg);
+  color: var(--sp-error-text);
+  font-size: 0.75rem;
+}
+.sm-receipts-lead { color: var(--sp-neutral-secondary); font-size: 0.95rem; }
+.sm-receipts-day { display: grid; gap: var(--sp-space-2); }
+.sm-receipts-day .sm-heading { font-size: 1.1rem; color: var(--sp-neutral-stronger); }
 
 /* Tab bar as buttons */
 .sm-tab { border: 0; background: none; font: inherit; font-size: 0.75rem; cursor: pointer; padding: 0; }

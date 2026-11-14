@@ -58,3 +58,19 @@ def test_health_stays_open(monkeypatch):
     # The app needs it to know whether to ask for a passcode.
     monkeypatch.setenv("DEMO_PASSCODE", "junction-2026")
     assert CLIENT.get("/health").status_code == 200
+
+
+def test_receipts_are_protected_and_stop_at_today(monkeypatch):
+    from datetime import date
+    asked = []
+    monkeypatch.setattr(api, "_today", lambda customer_id: date(2026, 9, 10))
+    monkeypatch.setattr(api.queries, "recent_purchases",
+                        lambda customer_id, until, limit: asked.append((customer_id, until, limit)) or [])
+    monkeypatch.setenv("DEMO_PASSCODE", "junction-2026")
+
+    assert CLIENT.get("/customers/CUST00226/receipts").status_code == 401
+    response = CLIENT.get("/customers/CUST00226/receipts?limit=5", headers={"X-Demo-Passcode": "junction-2026"})
+    assert response.json() == {"today": "2026-09-10", "receipts": []}
+    assert asked == [("CUST00226", date(2026, 9, 10), 5)]
+    bad = CLIENT.get("/customers/CUST00226/receipts?limit=500", headers={"X-Demo-Passcode": "junction-2026"})
+    assert bad.status_code == 400

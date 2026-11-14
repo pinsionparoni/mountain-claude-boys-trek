@@ -9,12 +9,13 @@ import { LoginScreen } from "./components/LoginScreen";
 import { MessageCentre } from "./components/MessageCentre";
 import { MinaPage } from "./components/MinaPage";
 import { PankkiPage } from "./components/PankkiPage";
+import { ReceiptsPage } from "./components/ReceiptsPage";
 import { SafeToSpendCard } from "./components/SafeToSpendCard";
 import { SmobiiliHome } from "./components/SmobiiliHome";
 import { demoCustomers } from "./fixtures/demo";
-import { PasscodeError, checkPasscode, fetchBudget, fetchHealth, fetchSummary, rememberPasscode } from "./lib/api";
+import { PasscodeError, checkPasscode, fetchBudget, fetchHealth, fetchReceipts, fetchSummary, rememberPasscode } from "./lib/api";
 import { formatDay, text, type Lang } from "./lib/i18n";
-import type { BasketSummary, Budget } from "./lib/types";
+import type { BasketSummary, Budget, Receipts } from "./lib/types";
 
 const LANG_KEY = "coach-lang";
 
@@ -37,9 +38,10 @@ export default function App() {
   const [loggedIn, setLoggedIn] = useState(false);
   const [tab, setTab] = useState<Tab>("home");
   // Message centre and coach open over the tabs, like full screens in S-mobiili.
-  const [overlay, setOverlay] = useState<null | "messages" | "coach">(null);
+  const [overlay, setOverlay] = useState<null | "messages" | "coach" | "receipts">(null);
   const [summary, setSummary] = useState<BasketSummary | null>(null);
   const [budget, setBudget] = useState<Budget | null>(null);
+  const [receipts, setReceipts] = useState<Receipts | null>(null);
   const [error, setError] = useState(false);
   // The hosted demo needs a passcode before any data loads (null: still asking the backend).
   const [passcodeRequired, setPasscodeRequired] = useState<boolean | null>(null);
@@ -61,6 +63,7 @@ export default function App() {
     setCustomerId(id);
     setSummary(null);
     setBudget(null);
+    setReceipts(null);
     setError(false);
   };
 
@@ -90,6 +93,10 @@ export default function App() {
         if (e instanceof PasscodeError) { setPasscodeError(true); setLoggedIn(false); }
         else setError(true);
       });
+    // Receipts load on their own, so a problem there never hides the cards.
+    fetchReceipts(customerId)
+      .then((r) => current && setReceipts(r))
+      .catch(() => current && setReceipts({ today: "", receipts: [] }));
     return () => { current = false; };
   }, [customerId, canLoad]);
 
@@ -108,7 +115,9 @@ export default function App() {
 
               <div className="sm-screen" hidden={overlay !== null}>
                 <main className="sm-scroll">
-                  {tab === "home" && <SmobiiliHome t={t} lang={lang} budget={budget}
+                  {tab === "home" && <SmobiiliHome t={t} lang={lang} budget={budget} summary={summary}
+                                                   latestReceipt={receipts?.receipts[0] ?? null}
+                                                   onOpenReceipts={() => setOverlay("receipts")}
                                                    onOpenMessages={openMessages} onLogout={logout} />}
                   {tab === "card" && <EtukorttiPage t={t} />}
                   {tab === "bank" && <PankkiPage t={t} lang={lang} budget={budget} summary={summary}
@@ -116,6 +125,11 @@ export default function App() {
                   {tab === "me" && <MinaPage t={t} customerId={customerId} onOpenMessages={openMessages} />}
                 </main>
                 <BottomNav t={t} active={tab} onSelect={setTab} />
+              </div>
+
+              <div className="sm-screen" hidden={overlay !== "receipts"}>
+                <ReceiptsPage t={t} lang={lang} receipts={receipts?.receipts ?? null} today={receipts?.today || null}
+                              summary={summary} onBack={() => setOverlay(null)} />
               </div>
 
               <div className="sm-screen" hidden={overlay !== "messages"}>

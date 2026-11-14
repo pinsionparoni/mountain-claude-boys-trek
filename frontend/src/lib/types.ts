@@ -48,6 +48,21 @@ export interface Budget {
   limited_by: "budget" | "cash";
 }
 
+/** One card purchase from GET /customers/{id}/receipts (coach/database/queries.py recent_purchases). */
+export interface Receipt {
+  timestamp: string;       // ISO, local time of the purchase
+  category: string;        // the data's category, e.g. "Groceries"
+  merchant_type: string;   // spending_baskets.MERCHANT_TYPES label, or "other"
+  basket: BasketKey | "unclassified";
+  amount_eur: number;      // money out, positive
+  unusual: boolean;        // a large one-off purchase
+}
+
+export interface Receipts {
+  today: string;
+  receipts: Receipt[];
+}
+
 export interface ChatMessage {
   id: string;
   author: "user" | "assistant";
