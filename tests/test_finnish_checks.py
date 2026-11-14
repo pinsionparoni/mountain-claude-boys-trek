@@ -29,6 +29,8 @@ def codes(text):
     "Vertasin kulutustasi muihin 18–24-vuotiaisiin ajalla 1.9.2025–31.8.2026.",
     "*   **746,21 €** – Asuminen (lasku) 🏠",          # list item opening with a label
     "1. Avaa S-mobiili. 2. Valitse S-Pankin tili.",    # brands, numbered list
+    "Voit ohjata Bonuksen Säästäjä-palveluun tai S-Tuottotilille.",
+    "Maksutonta apua saa Oikeuspalveluviraston talous- ja velkaneuvonnasta.",
     "Helsingissä ja muualla Suomessa EU:n säännöt pätevät.",
     "Pieni vinkki: kannattaa suosia kotiruokaa. Tsemppiä!",
     "Kokous on klo 14.30.",                            # Finnish time, not a decimal
@@ -182,3 +184,22 @@ def test_names_and_sentences_after_a_year_are_not_flagged(text):
 def test_ordinal_dates_still_continue_the_sentence():
     issues = check_answer("Palkkapäivä on 15. Syyskuuta.")
     assert any(i.code == "capital_mid_sentence" for i in issues)
+
+
+# Native reviewer's corrections (coach-review-gemma, 14 Nov 2026).
+@pytest.mark.parametrize("bad, code", [
+    ("Suurimpia eräitä olivat ruokaostokset.", "grammar"),
+    ("Yhteensä kulutuksiasi oli elokuussa 2 541,89 €.", "grammar"),
+    ("Jos haluat tarkastella, mihin arjen kulutuksen summa muodostuu, kysy.", "wrong_word"),
+])
+def test_reviewer_corrections_are_caught(bad, code):
+    assert any(i.code == code for i in check_answer(bad))
+
+
+@pytest.mark.parametrize("good", [
+    "Suurimpia eriä olivat ruokaostokset.",
+    "Elokuussa kulutit yhteensä 2 541,89 €.",
+    "Jos haluat tarkastella, mistä arjen kulutus koostuu, kysy.",
+])
+def test_corrected_wording_passes(good):
+    assert not [i for i in check_answer(good) if i.severity == ERROR]

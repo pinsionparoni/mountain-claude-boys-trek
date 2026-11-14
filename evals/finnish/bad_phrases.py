@@ -32,7 +32,12 @@ BAD_PHRASES = [
     (r"\bikäisissä\b", "grammar", ERROR,
      "Väärä sijamuoto. Esim. 'ikäisilläsi' tai 'ikäistesi joukossa'."),
     (r"\bkulutuksia(?:si)?\s+oli\b", "grammar", ERROR,
-     "Kongruenssi: 'Kulutuksesi oli yhteensä …'."),
+     "Kongruenssi: 'Kulutuksesi oli yhteensä …' tai luontevammin 'Kulutit yhteensä …'."),
+    # Found by a native reviewer, 14 Nov 2026 (coach-review-gemma, baskets-fi-1).
+    (r"\beräitä\b", "grammar", ERROR,
+     "Väärä monikko: 'eriä' (esim. 'Suurimpia eriä olivat …')."),
+    (r"\bmihin\b[^.?!\n]{0,60}\bmuodostu\w*", "wrong_word", ERROR,
+     "Esim. 'mistä arjen kulutus koostuu' (ei 'mihin … muodostuu')."),
     (r"\b\d+\s?[–-]\s?\d+\s+vuotta\b", "age_range", WARNING,
      "Ikäryhmä adjektiivina: '18–24-vuotiaat' tai '18–24-vuotiaiden'."),
 ]
