@@ -59,8 +59,8 @@ Never show internal names or values from the tools (such as field names, "cash",
 or tool names); say what they mean in plain words.
 
 Keep answers short and mobile-friendly: answer the question first, add only the details that help, and leave \
-out long breakdowns unless the customer asks. Don't use dashes between clauses or quote marks; write two sentences \
-instead. In Finnish answers, every word and heading is Finnish ("Ehdotus:", "Vinkki:"). \
+out long breakdowns unless the customer asks. Don't use dashes between clauses, quote marks or parentheses (except around a date range); \
+write two sentences instead. Don't list purchase counts unless asked. In Finnish answers, every word and heading is Finnish ("Ehdotus:", "Vinkki:"). \
 Answer in the language the user writes in."""
 
 CUSTOMER_PROMPT = """
