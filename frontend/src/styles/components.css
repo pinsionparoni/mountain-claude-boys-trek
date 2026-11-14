@@ -1,0 +1,215 @@
+/* Layout and components. Visual values come from tokens.css; no raw colours here. */
+
+*, *::before, *::after { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--sp-white);
+}
+
+.app {
+  min-block-size: 100dvh;
+  font-family: var(--sp-font-body);
+  font-size: var(--sp-font-size-body);
+  line-height: var(--sp-line-height-body);
+  color: var(--sp-text);
+  background: var(--sp-page-bg);
+}
+
+h1, h2, p { margin: 0; }
+
+.muted { color: var(--sp-text-secondary); }
+
+.money { font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+.visually-hidden {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+:focus-visible {
+  outline: var(--sp-focus-width) solid var(--sp-focus-color);
+  outline-offset: var(--sp-focus-offset);
+}
+
+/* Header */
+.app-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-space-2);
+  padding: var(--sp-space-3) var(--sp-layout-gutter);
+  border-block-end: 1px solid var(--sp-panel-border);
+}
+
+.app-name {
+  font-family: var(--sp-font-display);
+  font-weight: var(--sp-weight-bold);
+  font-size: 1.25rem;
+}
+
+.demo-badge {
+  padding: var(--sp-space-1) var(--sp-space-3);
+  border-radius: var(--sp-radius-pill);
+  font-size: var(--sp-font-size-small);
+  color: var(--sp-info-text);
+  background: var(--sp-info-bg);
+}
+
+/* Layout */
+.app-main {
+  max-inline-size: var(--sp-layout-max-width);
+  margin-inline: auto;
+  padding: var(--sp-space-6) var(--sp-layout-gutter) var(--sp-space-12);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--sp-space-6);
+}
+
+.welcome { display: grid; gap: var(--sp-space-2); }
+
+.page-title {
+  font-family: var(--sp-font-display);
+  font-size: var(--sp-font-size-page-title);
+  line-height: var(--sp-line-height-heading);
+  font-weight: var(--sp-weight-bold);
+  text-transform: uppercase;
+}
+
+.lead { font-size: 1.125rem; }
+
+.layout { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--sp-space-6); }
+.layout-side { display: grid; gap: var(--sp-space-6); align-content: start; }
+
+@media (min-width: 900px) {
+  .layout { grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); align-items: start; }
+}
+
+/* Panels */
+.panel {
+  display: grid;
+  gap: var(--sp-space-3);
+  padding: var(--sp-space-6);
+  border-radius: var(--sp-radius-panel);
+  background: var(--sp-panel-bg);
+  border: var(--sp-control-border-width) solid var(--sp-panel-border);
+  box-shadow: var(--sp-shadow-panel);
+}
+
+[data-card-style="flat"] .panel { border-color: transparent; background: var(--sp-surface-faint); }
+
+.panel--highlight { background: var(--sp-basket-total-bg); border-color: transparent; }
+
+.panel-title {
+  font-size: var(--sp-font-size-panel-title);
+  line-height: 1.2;
+  font-weight: var(--sp-weight-bold);
+}
+
+.sts-amount {
+  font-family: var(--sp-font-display);
+  font-size: clamp(2.5rem, 8vw, 3.5rem);
+  line-height: 1;
+  font-weight: var(--sp-weight-bold);
+}
+
+.estimate-note { font-size: var(--sp-font-size-small); }
+
+/* Baskets */
+.basket-list { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--sp-space-4); }
+
+.basket { display: grid; gap: var(--sp-space-1); --basket-color: var(--sp-basket-regular); --basket-bg: var(--sp-basket-regular-bg); }
+.basket--unexpected { --basket-color: var(--sp-basket-unexpected); --basket-bg: var(--sp-basket-unexpected-bg); }
+.basket--everyday { --basket-color: var(--sp-basket-everyday); --basket-bg: var(--sp-basket-everyday-bg); }
+
+.basket-row { display: flex; justify-content: space-between; gap: var(--sp-space-3); flex-wrap: wrap; }
+.basket-label { font-weight: var(--sp-weight-medium); }
+.basket-amount { font-weight: var(--sp-weight-bold); }
+
+.basket-bar {
+  block-size: 10px;
+  border-radius: var(--sp-radius-pill);
+  background: var(--basket-bg);
+  overflow: hidden;
+}
+
+.basket-bar-fill {
+  block-size: 100%;
+  border-radius: var(--sp-radius-pill);
+  background: var(--basket-color);
+}
+
+.basket-meta { font-size: var(--sp-font-size-small); }
+
+/* Chat */
+.chat { align-content: start; }
+
+.chat-log { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--sp-space-3); }
+
+.chat-message {
+  max-inline-size: min(100%, var(--sp-reading-max-width));
+  padding: var(--sp-space-3) var(--sp-space-4);
+  border-radius: var(--sp-radius-message);
+  color: var(--sp-chat-text);
+  overflow-wrap: anywhere;
+}
+
+.chat-message--assistant {
+  background: var(--sp-chat-assistant-bg);
+  border: 1px solid var(--sp-panel-border);
+  justify-self: start;
+}
+
+.chat-message--user { background: var(--sp-chat-user-bg); justify-self: end; }
+
+.chips { display: flex; flex-wrap: wrap; gap: var(--sp-space-2); }
+
+.chip {
+  min-block-size: var(--sp-control-min-height);
+  padding: var(--sp-space-2) var(--sp-space-4);
+  border-radius: var(--sp-radius-pill);
+  border: 1px solid var(--sp-green-strong);
+  background: var(--sp-white);
+  color: var(--sp-green-strongest);
+  font: inherit;
+  font-size: var(--sp-font-size-small);
+  cursor: pointer;
+  transition: background var(--sp-duration-faster) var(--sp-ease-default);
+}
+
+.chip:hover { background: var(--sp-button-tonal-bg); }
+.chip:active { background: var(--sp-button-tonal-bg-active); }
+
+.composer { display: flex; gap: var(--sp-space-2); align-items: end; }
+
+.composer-input {
+  flex: 1;
+  min-block-size: var(--sp-control-min-height);
+  padding: var(--sp-space-3);
+  border-radius: var(--sp-radius-input);
+  border: var(--sp-control-border-width) solid var(--sp-green-strongest);
+  font: inherit;
+  color: var(--sp-text);
+  resize: vertical;
+}
+
+/* Buttons */
+.button {
+  min-block-size: var(--sp-control-min-height);
+  padding-inline: var(--sp-space-6);
+  border: 0;
+  border-radius: var(--sp-radius-pill);
+  font: inherit;
+  font-weight: var(--sp-weight-bold);
+  cursor: pointer;
+  transition: background var(--sp-duration-faster) var(--sp-ease-default);
+}
+
+.button--primary { background: var(--sp-button-primary-bg); color: var(--sp-button-primary-text); }
+.button--primary:hover { background: var(--sp-button-primary-bg-hover); }
+.button--primary:active { background: var(--sp-button-primary-bg-active); }

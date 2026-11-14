@@ -1,0 +1,172 @@
+/*
+ * S-Pankki Financial Coach: independent prototype token layer.
+ * Research snapshot: 2026-11-14. Not an official brand package.
+ *
+ * Verified color and motion values:
+ * https://www.s-pankki.fi/Assets/css/design-system.min.css
+ * Observed public-site component values:
+ * https://www.s-pankki.fi/Assets/css/s-pankki_theme.min.css
+ * Font names/weights:
+ * https://www.s-pankki.fi/Assets/fonts/SBonusDisplay.css
+ * https://www.s-pankki.fi/Assets/fonts/SBonusUX.css
+ * Asset-use restrictions:
+ * https://www.s-pankki.fi/fi/kayttoehdot/
+ *
+ * Import once; add class="sp-coach" to the app root.
+ * No logo, photo or font assets are included or fetched.
+ * No automatic dark theme: one was not verified.
+ * Custom property names and app mappings below are original adaptations.
+ */
+
+.sp-coach {
+  /* VERIFIED: production color values; these are local aliases. */
+  --sp-green-strongest: #004628;
+  --sp-green-strong: #007841;
+  --sp-green-medium: #00aa46;
+  --sp-green-vivid: #00eb5a;
+  --sp-green-light: #91fa9b;
+  --sp-green-hover: #49f37b;
+  --sp-green-pale: #ebf7ec;
+  --sp-green-paler-secondary: #d2fcd5;
+  --sp-green-pale-secondary: #eafeec;
+  --sp-green-faint: #f7fcf7;
+  --sp-neutral-strongest: #1f1f1f;
+  --sp-neutral-stronger: #363636;
+  --sp-neutral-secondary: #666666;
+  --sp-border-default: #949494;
+  --sp-border-subtle: #e6e6e6;
+  --sp-border-green: #99d59f;
+  --sp-white: #ffffff;
+  --sp-surface-neutral: #f5f5f5;
+  --sp-surface-faint: #fafafa;
+
+  --sp-info-text: #006e87;
+  --sp-info-bg: #e0f4ff;
+  --sp-info-border: #00a1c5;
+  --sp-warning-text: #885600;
+  --sp-warning-bg: #fff1d8;
+  --sp-warning-border: #cf8300;
+  --sp-error-text: #b70000;
+  --sp-error-bg: #ffeded;
+  --sp-error-border: #b70000;
+  --sp-success-text: #007841;
+  --sp-success-bg: #ebf7ec;
+  --sp-success-border: #00aa46;
+
+  /* VERIFIED: exact filled-primary and tonal-primary state values. */
+  --sp-button-primary-bg: #91fa9b;
+  --sp-button-primary-bg-hover: #49f37b;
+  --sp-button-primary-bg-active: #00eb5a;
+  --sp-button-primary-text: #004628;
+  --sp-button-tonal-bg: #ebf7ec;
+  --sp-button-tonal-bg-hover: #e0f3e1;
+  --sp-button-tonal-bg-active: #d5eed7;
+  --sp-button-tonal-text: #007841;
+  --sp-focus-color: #1f1f1f;
+
+  /* VERIFIED: family names and available weights.
+     Add licensed local @font-face declarations separately when approved.
+     Local Arial/system fallbacks are not an exact visual match. */
+  --sp-font-body: "S Bonus UX", Arial, system-ui, sans-serif;
+  --sp-font-display: "S Bonus Display", "Arial Narrow", Arial, sans-serif;
+  --sp-weight-regular: 400;
+  --sp-weight-medium: 500;
+  --sp-weight-semibold: 600;
+  --sp-weight-bold: 700;
+
+  /* VERIFIED: published durations and default/entry/exit easing values. */
+  --sp-duration-fastest: 100ms;
+  --sp-duration-faster: 150ms;
+  --sp-duration-fast: 200ms;
+  --sp-duration-moderate: 250ms;
+  --sp-duration-default: 300ms;
+  --sp-duration-slow: 500ms;
+  --sp-ease-default: cubic-bezier(0.33, 0, 0.34, 1);
+  --sp-ease-entry: cubic-bezier(0, 0, 0.3, 1);
+  --sp-ease-exit: cubic-bezier(0.5, 0, 1, 1);
+
+  /* OBSERVED: calculator radius and marketing card values.
+     These px observations are not a complete official component scale. */
+  --sp-radius-input: 12px;
+  --sp-radius-marketing-card-desktop: 56px;
+  --sp-radius-marketing-card-mobile: 36px;
+  --sp-marketing-card-border: #c7c7c7;
+  --sp-button-height-medium-desktop: 56px;
+
+  /* PROPOSED: app sizes intentionally decoupled from site's 17/18px root.
+     All values in this block are prototype decisions, not official tokens. */
+  --sp-space-1: 4px;
+  --sp-space-2: 8px;
+  --sp-space-3: 12px;
+  --sp-space-4: 16px;
+  --sp-space-5: 20px;
+  --sp-space-6: 24px;
+  --sp-space-8: 32px;
+  --sp-space-12: 48px;
+  --sp-space-16: 64px;
+  --sp-radius-panel: 24px;
+  --sp-radius-message: 16px;
+  --sp-radius-pill: 9999px;
+  --sp-font-size-body: 1rem;
+  --sp-font-size-small: 0.875rem;
+  --sp-font-size-panel-title: 1.5rem;
+  --sp-font-size-page-title: clamp(2rem, 4vw, 2.5rem);
+  --sp-line-height-body: 1.55;
+  --sp-line-height-heading: 1.08;
+  --sp-control-min-height: 48px;
+  --sp-control-border-width: 1px;
+  --sp-focus-width: 3px;
+  --sp-focus-offset: 3px;
+  --sp-layout-max-width: 1200px;
+  --sp-reading-max-width: 680px;
+  --sp-layout-gutter: 16px;
+  --sp-shadow-panel: none;
+
+  /* PROPOSED: semantic app mappings to verified palette values.
+     Medium #00AA46 on white is NOT suitable for normal-size text. */
+  --sp-page-bg: var(--sp-white);
+  --sp-panel-bg: var(--sp-white);
+  --sp-text: var(--sp-green-strongest);
+  --sp-text-secondary: var(--sp-neutral-secondary);
+  --sp-link: var(--sp-green-strong);
+  --sp-panel-border: var(--sp-border-subtle);
+  --sp-chat-assistant-bg: var(--sp-white);
+  --sp-chat-user-bg: var(--sp-green-pale);
+  --sp-chat-text: var(--sp-green-strongest);
+  --sp-basket-bg: var(--sp-white);
+  --sp-basket-total-bg: var(--sp-green-pale);
+  --sp-chart-primary: var(--sp-green-strong);
+  --sp-chart-comparison: var(--sp-neutral-secondary);
+  --sp-chart-grid: var(--sp-border-subtle);
+
+  /* PROPOSED (Financial Coach): basket colours. No official multi-series
+     palette exists, so these reuse verified S-Pankki colours that each pass
+     AA on white (5.6-6.2:1). They differ by hue only, so always show the
+     basket's text label next to the colour. */
+  --sp-basket-regular: var(--sp-green-strong);
+  --sp-basket-regular-bg: var(--sp-green-pale);
+  --sp-basket-unexpected: var(--sp-warning-text);
+  --sp-basket-unexpected-bg: var(--sp-warning-bg);
+  --sp-basket-everyday: var(--sp-info-text);
+  --sp-basket-everyday-bg: var(--sp-info-bg);
+}
+
+@media (min-width: 768px) {
+  .sp-coach {
+    /* PROPOSED app gutter, not the marketing site's full grid. */
+    --sp-layout-gutter: 32px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sp-coach {
+    /* Components must consume these variables and separately disable
+       any looping animation, smooth scroll or library motion. */
+    --sp-duration-fastest: 0ms;
+    --sp-duration-faster: 0ms;
+    --sp-duration-fast: 0ms;
+    --sp-duration-moderate: 0ms;
+    --sp-duration-default: 0ms;
+    --sp-duration-slow: 0ms;
+  }
+}
