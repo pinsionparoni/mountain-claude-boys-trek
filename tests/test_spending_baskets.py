@@ -4,17 +4,22 @@ Unit tests for coach/spending_baskets.py (no database needed).
     python -m pytest tests/test_spending_baskets.py
 """
 
+from datetime import date
 from decimal import Decimal
 
 import pytest
 
 from coach.spending_baskets import (
     BASKET_KEYS,
+    CATEGORY_MEDIAN_EUR,
     CONSUMPTION_TRANSACTION_TYPES,
     EXCLUDED_FROM_CONSUMPTION,
-    classify_category,
+    OTHER_BASKETS,
+    classify_purchase,
     classify_transaction,
     is_consumption_transaction,
+    merchant_breakdown,
+    merchant_type,
     salary_sweep_info,
     summarize_baskets,
 )
@@ -78,37 +83,60 @@ def test_exclusion_list_covers_every_audited_non_consumption_type():
 # --------------------------------------------------------------------------
 
 @pytest.mark.parametrize(
-    "category, expected",
+    "category, mcc, amount, expected",
     [
-        ("Housing", "mandatory_regular"),
-        ("Utilities", "mandatory_regular"),
-        ("Groceries", "everyday_flexible"),
-        ("Restaurants", "everyday_flexible"),
-        ("Transportation", "everyday_flexible"),
-        ("Entertainment", "everyday_flexible"),
-        ("Lifestyle", "everyday_flexible"),
-        ("Travel", "everyday_flexible"),
-        ("Health", "needs_review"),
-        ("Home & Tech", "needs_review"),
-        ("Uncategorized", "needs_review"),
-        ("Brand New Category", "needs_review"),
+        # Bills go by category.
+        ("Housing", None, 900, "regular_essentials"),
+        ("Utilities", None, 60, "regular_essentials"),
+        # Card purchases go by merchant type.
+        ("Groceries", "5411", 60, "regular_essentials"),
+        ("Groceries", "5499", 60, "everyday_spending"),        # convenience / specialty food
+        ("Transportation", "5542", 40, "regular_essentials"),  # fuel
+        ("Transportation", "4111", 40, "regular_essentials"),  # public transport
+        ("Transportation", "4121", 40, "everyday_spending"),   # taxi
+        ("Health", "5912", 50, "regular_essentials"),          # pharmacy
+        ("Health", "8021", 50, "unexpected_necessities"),      # dentist
+        ("Home & Tech", "5732", 100, "unexpected_necessities"),
+        ("Restaurants", "5814", 20, "everyday_spending"),
+        ("Travel", "4511", 130, "everyday_spending"),
+        # No MCC: the category's majority basket.
+        ("Transportation", None, 40, "regular_essentials"),
+        ("Health", None, 50, "regular_essentials"),
+        ("Home & Tech", None, 100, "unexpected_necessities"),
+        ("Restaurants", None, 20, "everyday_spending"),
+        # A category the rules don't know is never guessed.
+        ("Brand New Category", None, 10, "unclassified"),
     ],
 )
-def test_classify_category_defaults(category, expected):
-    assert classify_category(category) == expected
+def test_classify_purchase(category, mcc, amount, expected):
+    assert classify_purchase(category, mcc, amount) == expected
 
 
-@pytest.mark.parametrize("category", ["Health", "Home & Tech"])
-def test_customer_confirmation_places_health_and_home_tech(category):
-    assert classify_category(category, "essential") == "mandatory_irregular"
-    assert classify_category(category, "optional") == "everyday_flexible"
-    assert classify_category(category, "needs_review") == "needs_review"
-    assert classify_category(category, None) == "needs_review"
+def test_large_health_and_home_tech_purchases_are_unexpected():
+    # 10x the median: Health 53.85 -> 538.50, Home & Tech 111.08 -> 1110.80.
+    assert classify_purchase("Health", "5912", Decimal("538.49")) == "regular_essentials"
+    assert classify_purchase("Health", "5912", Decimal("538.50")) == "unexpected_necessities"
+    assert classify_purchase("Health", None, 2000) == "unexpected_necessities"
+    assert classify_purchase("Home & Tech", "5732", 5000) == "unexpected_necessities"
 
 
-def test_customer_confirmation_cannot_move_fixed_categories():
-    assert classify_category("Restaurants", "essential") == "everyday_flexible"
-    assert classify_category("Housing", "optional") == "mandatory_regular"
+def test_large_purchases_elsewhere_keep_their_basket():
+    assert classify_purchase("Restaurants", "5812", 3000) == "everyday_spending"
+    assert classify_purchase("Groceries", "5411", 3000) == "regular_essentials"
+
+
+def test_customer_override_wins():
+    assert classify_purchase("Restaurants", "5812", 20, {"Restaurants": "regular_essentials"}) == "regular_essentials"
+    assert classify_purchase("Health", "8021", 2000, {"Health": "everyday_spending"}) == "everyday_spending"
+    # An unknown basket name is ignored.
+    assert classify_purchase("Restaurants", "5812", 20, {"Restaurants": "needs_review"}) == "everyday_spending"
+
+
+def test_merchant_type_labels():
+    assert merchant_type("4121", "Transportation") == "taxi"
+    assert merchant_type(None, "Transportation") == "other"
+    assert merchant_type("9999", "Transportation") == "other"
+    assert merchant_type(None, "Housing") == "bill"
 
 
 def test_classify_transaction_skips_financial_flows():
@@ -120,14 +148,14 @@ def test_classify_transaction_skips_financial_flows():
 
 
 def test_classify_transaction_places_consumption():
-    assert classify_transaction("Housing", "housing_payment") == "mandatory_regular"
-    assert classify_transaction("Groceries", "purchase") == "everyday_flexible"
-    assert classify_transaction("Health", "purchase") == "needs_review"
+    assert classify_transaction("Housing", "housing_payment") == "regular_essentials"
+    assert classify_transaction("Groceries", "purchase", "5411", 50) == "regular_essentials"
+    assert classify_transaction("Health", "purchase", "8011", 50) == "unexpected_necessities"
 
 
 def test_every_audited_pair_is_handled_deliberately():
     # No audited row may fall through: it is either a known basket or not
-    # consumption at all.
+    # consumption at all, even without an MCC.
     for category, transaction_type in AUDITED_PAIRS:
         basket = classify_transaction(category, transaction_type)
         if transaction_type in NON_CONSUMPTION_TYPES:
@@ -136,73 +164,102 @@ def test_every_audited_pair_is_handled_deliberately():
             assert basket in BASKET_KEYS, (category, transaction_type)
 
 
+def test_every_purchase_category_has_an_other_basket_and_a_median():
+    purchase_categories = {c for c, t in AUDITED_PAIRS if t == "purchase"}
+    assert set(OTHER_BASKETS) == purchase_categories
+    assert set(CATEGORY_MEDIAN_EUR) == purchase_categories
+
+
 # --------------------------------------------------------------------------
 # summarize_baskets
 # --------------------------------------------------------------------------
 
-ROWS = [
-    {"category": "Housing", "total_spending_eur": Decimal("1000.00"), "transaction_count": 10},
-    {"category": "Utilities", "total_spending_eur": Decimal("200.00"), "transaction_count": 5},
-    {"category": "Groceries", "total_spending_eur": Decimal("400.50"), "transaction_count": 20},
-    {"category": "Restaurants", "total_spending_eur": Decimal("99.50"), "transaction_count": 8},
-    {"category": "Health", "total_spending_eur": Decimal("300.00"), "transaction_count": 3},
+D = date(2026, 9, 1)
+TRANSACTIONS = [
+    {"tx_date": D, "category": "Housing", "mcc_code": None, "amount_eur": Decimal("1000.00")},
+    {"tx_date": D, "category": "Groceries", "mcc_code": "5411", "amount_eur": Decimal("300.50")},
+    {"tx_date": D, "category": "Transportation", "mcc_code": "4121", "amount_eur": Decimal("40.00")},
+    {"tx_date": D, "category": "Transportation", "mcc_code": None, "amount_eur": Decimal("60.00")},
+    {"tx_date": D, "category": "Restaurants", "mcc_code": "5812", "amount_eur": Decimal("99.50")},
+    {"tx_date": D, "category": "Health", "mcc_code": "8021", "amount_eur": Decimal("800.00")},  # large
 ]
 
 
 def test_summarize_baskets_totals_and_shares():
-    # Total 2000: regular 1200 (60%), everyday 500 (25%), review 300 (15%).
-    result = summarize_baskets(ROWS)
+    # Total 2300: regular 1360.50, unexpected 800, everyday 139.50.
+    result = summarize_baskets(TRANSACTIONS)
     baskets = result["baskets"]
 
-    assert result["total_spending_eur"] == 2000.0
-    assert baskets["mandatory_regular"]["total_eur"] == 1200.0
-    assert baskets["mandatory_regular"]["share_pct"] == 60.0
-    assert baskets["mandatory_regular"]["transaction_count"] == 15
-    assert baskets["everyday_flexible"]["total_eur"] == 500.0
-    assert baskets["everyday_flexible"]["share_pct"] == 25.0
-    assert baskets["everyday_flexible"]["transaction_count"] == 28
-    assert baskets["needs_review"]["total_eur"] == 300.0
-    assert baskets["needs_review"]["share_pct"] == 15.0
+    assert result["total_spending_eur"] == 2300.0
+    assert baskets["regular_essentials"]["total_eur"] == 1360.5
+    assert baskets["regular_essentials"]["share_pct"] == 59.2
+    assert baskets["regular_essentials"]["transaction_count"] == 3
+    assert baskets["unexpected_necessities"]["total_eur"] == 800.0
+    assert baskets["everyday_spending"]["total_eur"] == 139.5
+    assert baskets["everyday_spending"]["transaction_count"] == 2
+    assert baskets["regular_essentials"]["label"] == "🏠 Regular essentials"
 
 
-def test_summarize_baskets_always_has_every_basket():
-    baskets = summarize_baskets(ROWS)["baskets"]
-    assert set(baskets) == set(BASKET_KEYS)
-    assert baskets["mandatory_irregular"] == {
-        "total_eur": 0.0,
-        "share_pct": 0.0,
-        "transaction_count": 0,
-        "categories": [],
+def test_summarize_baskets_splits_categories_by_merchant_type():
+    regular = summarize_baskets(TRANSACTIONS)["baskets"]["regular_essentials"]["categories"]
+    assert regular[0] == {
+        "category": "Housing",
+        "total_eur": 1000.0,
+        "merchant_types": [{"merchant_type": "bill", "total_eur": 1000.0, "transaction_count": 1}],
     }
-
-
-def test_summarize_baskets_orders_categories_by_amount():
-    categories = summarize_baskets(ROWS)["baskets"]["mandatory_regular"]["categories"]
-    assert categories == [
-        {"category": "Housing", "total_eur": 1000.0},
-        {"category": "Utilities", "total_eur": 200.0},
+    transport_regular = next(c for c in regular if c["category"] == "Transportation")
+    assert transport_regular["merchant_types"] == [
+        {"merchant_type": "other", "total_eur": 60.0, "transaction_count": 1},
     ]
+    everyday = summarize_baskets(TRANSACTIONS)["baskets"]["everyday_spending"]["categories"]
+    assert [c["category"] for c in everyday] == ["Restaurants", "Transportation"]
 
 
-def test_summarize_baskets_with_no_spending():
-    result = summarize_baskets([])
-    assert result["total_spending_eur"] == 0.0
-    assert all(b["share_pct"] == 0.0 for b in result["baskets"].values())
+def test_summarize_baskets_reports_unusual_purchases():
+    unusual = summarize_baskets(TRANSACTIONS)["unusual_purchases"]
+    assert unusual == [{
+        "date": "2026-09-01",
+        "category": "Health",
+        "merchant_type": "dentist",
+        "amount_eur": 800.0,
+        "times_usual": 14.9,  # 800 / 53.85
+        "basket": "unexpected_necessities",
+    }]
 
 
-def test_summarize_baskets_applies_customer_confirmation():
-    result = summarize_baskets(ROWS, {"Health": "essential"})
-    baskets = result["baskets"]
-    assert baskets["mandatory_irregular"]["total_eur"] == 300.0
-    assert baskets["needs_review"]["total_eur"] == 0.0
-    assert result["total_spending_eur"] == 2000.0  # total never changes
+def test_summarize_baskets_always_has_the_three_baskets():
+    baskets = summarize_baskets([])["baskets"]
+    assert set(baskets) == set(BASKET_KEYS)
+    assert baskets["unexpected_necessities"]["total_eur"] == 0.0
+    assert all(b["share_pct"] == 0.0 for b in baskets.values())
+
+
+def test_summarize_baskets_shows_unclassified_only_when_needed():
+    assert "unclassified" not in summarize_baskets(TRANSACTIONS)["baskets"]
+    rows = [{"tx_date": D, "category": "Brand New Category", "mcc_code": None, "amount_eur": 5}]
+    assert summarize_baskets(rows)["baskets"]["unclassified"]["total_eur"] == 5.0
+
+
+def test_summarize_baskets_applies_customer_overrides():
+    result = summarize_baskets(TRANSACTIONS, {"Restaurants": "regular_essentials"})
+    assert result["baskets"]["everyday_spending"]["total_eur"] == 40.0
+    assert result["total_spending_eur"] == 2300.0  # total never changes
 
 
 def test_summarize_baskets_accepts_plain_floats():
-    rows = [{"category": "Groceries", "total_spending_eur": 19.99, "transaction_count": 1}]
+    rows = [{"tx_date": D, "category": "Groceries", "mcc_code": "5411", "amount_eur": 19.99}]
     result = summarize_baskets(rows)
     assert result["total_spending_eur"] == 19.99
-    assert result["baskets"]["everyday_flexible"]["share_pct"] == 100.0
+    assert result["baskets"]["regular_essentials"]["share_pct"] == 100.0
+
+
+def test_merchant_breakdown():
+    types = merchant_breakdown(TRANSACTIONS, "Transportation")
+    assert types == [
+        {"merchant_type": "other", "total_eur": 60.0, "transaction_count": 1, "baskets": ["regular_essentials"]},
+        {"merchant_type": "taxi", "total_eur": 40.0, "transaction_count": 1, "baskets": ["everyday_spending"]},
+    ]
+    assert merchant_breakdown(TRANSACTIONS, "Travel") == []
 
 
 # --------------------------------------------------------------------------

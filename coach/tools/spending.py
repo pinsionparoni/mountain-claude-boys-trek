@@ -5,10 +5,10 @@ The customer is fixed when the tools are created: ``load_tools(customer_id)``.
 No tool accepts a customer ID, and unexpected arguments are rejected, so the
 model can never read another customer's data, even if it tries.
 
-Seven tools:
+Eight tools:
 
 - Data (PostgreSQL): ``get_spending_by_category``, ``get_basket_summary``,
-  ``get_monthly_balance_trend``.
+  ``get_monthly_balance_trend``, ``get_transactions``.
 - Calculations (plain Python, see ``coach/calculations.py``):
   ``calculate_prorated_amount``, ``calculate_safe_to_spend``,
   ``calculate_safe_to_save``, ``calculate_what_if``.
@@ -26,7 +26,7 @@ import json
 from datetime import date
 from decimal import Decimal
 
-from coach import calculations
+from coach import calculations, spending_baskets
 from coach.database import queries
 
 # First and last day of the S-Pankki dataset, from the full-table audit.
@@ -43,10 +43,13 @@ Use get_spending_by_category for category questions and get_basket_summary for "
 Always say which dates you used.
 - Never do money arithmetic yourself. Use the monthly_average_eur values the tools return, and use the calculate_* tools \
 for safe-to-spend, safe-to-save and what-if questions. Report their numbers exactly as given.
-- Baskets: Housing and Utilities are mandatory and regular. Groceries, Restaurants, Transportation, Entertainment, \
-Lifestyle and Travel are everyday spending. Health and Home & Tech land in "needs_review": the data cannot tell \
-whether they were essential, so ask the customer rather than assuming. Mandatory and irregular stays empty until the \
-customer confirms something belongs there.
+- Baskets: use S-Bank's names exactly: "🏠 Regular essentials", "🔧 Unexpected necessities" and \
+"☕ Everyday spending". get_basket_summary places every purchase by merchant type: e.g. fuel, parking and public \
+transport are regular essentials, taxis are everyday spending, doctors and dentists are unexpected necessities, and \
+large one-off Health or Home & Tech purchases are unexpected necessities. Purchases without a merchant type are \
+"other". Explain the placement when it matters and that the customer can see things differently.
+- For questions about one kind of merchant (taxis, fuel, pharmacies, cafés), call get_spending_by_category with \
+that category to get its merchant types. Mention unusual_purchases when they explain a month.
 - Salary, other income, salary sweeps and investments are money movements, not spending. They are never in the baskets.
 - If get_basket_summary says has_salary_sweep is true, tell the customer that their mandatory totals may be incomplete, \
 using salary_sweep_note.
@@ -133,6 +136,24 @@ _DATE_PROPERTIES = {
 }
 
 
+_CATEGORY_PROPERTY = {
+    "type": "string",
+    "description": "One spending category.",
+    "enum": sorted([*spending_baskets.CATEGORY_BASKETS, *spending_baskets.OTHER_BASKETS]),
+}
+
+
+def _category(args):
+    """The optional category argument, checked so a typo gets a helpful error instead of no data."""
+    category = args.get("category")
+    if category is not None and category not in _CATEGORY_PROPERTY["enum"]:
+        raise ValueError(
+            f"unknown category {category!r}; use one of: {', '.join(_CATEGORY_PROPERTY['enum'])}. "
+            "For merchant types such as taxis, pass their category (Transportation)."
+        )
+    return category
+
+
 def _number(description):
     return {"type": "number", "description": description}
 
@@ -150,6 +171,21 @@ def load_tools(customer_id):
 
     def spending_by_category(args):
         start, end, days = _period(args)
+        category = _category(args)
+        if category is not None:
+            transactions = queries.consumption_transactions(customer_id, start, end)
+            types = spending_baskets.merchant_breakdown(transactions, category)
+            total = sum((Decimal(str(m["total_eur"])) for m in types), Decimal(0))
+            for m in types:
+                m["monthly_average_eur"] = calculations.monthly_equivalent(m["total_eur"], days)
+            return {
+                "period": {"start_date": start.isoformat(), "end_date": end.isoformat(), "days": days},
+                "category": category,
+                "merchant_types": types,
+                "total_eur": _eur(total),
+                "monthly_average_eur": calculations.monthly_equivalent(total, days),
+            }
+
         rows = queries.spending_by_category(customer_id, start, end)
 
         total = Decimal(0)
@@ -216,6 +252,29 @@ def load_tools(customer_id):
             ),
         }
 
+    def transactions(args):
+        start, end, _ = _period(args)
+        limit = _whole_number("limit", args.get("limit", 20))
+        rows = queries.list_transactions(
+            customer_id, start, end,
+            category=_category(args), order=args.get("order", "largest"), limit=limit,
+        )
+        return {
+            "transactions": [
+                {
+                    "timestamp": row["tx_timestamp"].isoformat(timespec="minutes"),
+                    "category": row["category"],
+                    "merchant_type": (spending_baskets.merchant_type(row["mcc_code"], row["category"])
+                                      if spending_baskets.is_consumption_transaction(row["transaction_type"])
+                                      else None),
+                    "amount_eur": _eur(row["amount_eur"]),
+                    "balance_after_eur": _eur(row["balance_after_eur"]),
+                }
+                for row in rows
+            ],
+            "note": "amount_eur is signed: negative is money out.",
+        }
+
     # ---- calculation tools ------------------------------------------------
 
     def prorated_amount(args):
@@ -258,20 +317,22 @@ def load_tools(customer_id):
             description=(
                 "The customer's real spending per category over a period, largest first, with totals, "
                 "monthly averages and transaction counts. Only consumption counts: salary, income, "
-                "salary sweeps and investments are excluded."
+                "salary sweeps and investments are excluded. With a category, that category split by merchant "
+                "type instead (e.g. Transportation -> fuel, parking, public transport, taxi, other), each with "
+                "the basket(s) it counts in."
             ),
-            properties=dict(_DATE_PROPERTIES),
+            properties={**_DATE_PROPERTIES, "category": _CATEGORY_PROPERTY},
             required=["start_date", "end_date"],
             handler=spending_by_category,
         ),
         CoachTool(
             name="get_basket_summary",
             description=(
-                "The customer's spending grouped into the three baskets (mandatory regular, mandatory "
-                "irregular, everyday) plus needs_review for spending whose purpose is unknown. Includes "
-                "shares, per-category breakdown, monthly averages, and separately the money movements "
-                "(income, salary sweeps, investments) with has_salary_sweep and a caveat when salary "
-                "leaves the account."
+                "The customer's spending grouped into S-Bank's three baskets (regular_essentials, "
+                "unexpected_necessities, everyday_spending), each with its label, share, monthly average and "
+                "categories split by merchant type, plus unusual_purchases (large one-off purchases). "
+                "Separately the money movements (income, salary sweeps, investments) with has_salary_sweep and "
+                "a caveat when salary leaves the account."
             ),
             properties=dict(_DATE_PROPERTIES),
             required=["start_date", "end_date"],
@@ -293,6 +354,23 @@ def load_tools(customer_id):
             },
             required=[],
             handler=monthly_balance_trend,
+        ),
+        CoachTool(
+            name="get_transactions",
+            description=(
+                "Individual transactions in a period: the largest money out first, or the latest first. "
+                "Optionally one category. Use for 'what were my biggest purchases' or to explain a total."
+            ),
+            properties={
+                **_DATE_PROPERTIES,
+                "category": _CATEGORY_PROPERTY,
+                "order": {"type": "string", "enum": ["largest", "latest"],
+                          "description": "Default largest."},
+                "limit": {"type": "integer", "minimum": 1, "maximum": 50,
+                          "description": "How many transactions, default 20."},
+            },
+            required=["start_date", "end_date"],
+            handler=transactions,
         ),
         CoachTool(
             name="calculate_prorated_amount",

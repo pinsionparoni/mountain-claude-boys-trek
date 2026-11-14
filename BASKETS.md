@@ -1,6 +1,6 @@
 # Spending baskets
 
-**Status: proposal for the team to review.** Not implemented yet; the rules layer (`coach/spending_baskets.py` on `database-test-branch`) is where it will live. Data facts behind it: [DATA.md](DATA.md).
+**Status: implemented** in `coach/spending_baskets.py` (tests in `tests/test_spending_baskets.py`). The ⚠️ questions below are still open; changing a rule means changing one table there. Data facts behind it: [DATA.md](DATA.md).
 
 S-Bank's three baskets ([CHALLENGE.md](CHALLENGE.md#summary-brief-s-pankki-pdf)). All spending goes into one of them:
 

@@ -1,38 +1,35 @@
 """
-Spending basket definitions and evidence-based classification signals.
+What counts as spending, and which of S-Bank's three baskets it belongs to.
 
-Important:
-- Transaction type determines whether a row is consumption, income, investment,
-  or an unresolved financial flow.
-- Category/MCC behavior is a descriptive signal, not proof that a purchase is
-  essential or discretionary.
-- Health and Home & Tech remain unassigned until the customer or a trusted
-  business rule confirms their purpose.
+Rules (see BASKETS.md for the reasoning and open questions):
+
+1. Only consumption transaction types are spending. Salary, other income,
+   investments and salary sweeps are money movements, never in a basket.
+2. Bills (Housing, Utilities) go by category.
+3. Large one-off purchases in Health and Home & Tech are unexpected
+   necessities, whatever the merchant type. Large purchases elsewhere keep
+   their basket but are reported as unusual.
+4. Card purchases go by merchant type (MCC).
+5. Purchases without an MCC are "other" within their category and go to the
+   basket most of that category's known merchant types belong to.
+
+A customer's own choice (``basket_overrides``) wins over all of these.
 """
 
 from decimal import ROUND_HALF_UP, Decimal
 
-# The three product baskets. These lists intentionally contain only categories
-# that can be assigned from the available transaction data with reasonable
-# confidence. Health and Home & Tech are handled separately below.
-SPENDING_BASKETS = {
-    "mandatory_regular": [
-        "Housing",
-        "Utilities",
-    ],
-    "mandatory_irregular": [],
-    "everyday_flexible": [
-        "Groceries",
-        "Restaurants",
-        "Transportation",
-        "Entertainment",
-        "Lifestyle",
-        "Travel",
-    ],
+# The three baskets, with S-Bank's names from the challenge brief.
+BASKET_LABELS = {
+    "regular_essentials": "🏠 Regular essentials",
+    "unexpected_necessities": "🔧 Unexpected necessities",
+    "everyday_spending": "☕ Everyday spending",
 }
+BASKET_KEYS = tuple(BASKET_LABELS)
 
-# Preserve the existing exclusion constant for current query code.
-# These transaction types are not ordinary consumption.
+# Spending we cannot place (a category the rules don't know). Shown only when
+# non-empty, never silently put into a basket.
+UNCLASSIFIED = "unclassified"
+
 INCOME_TYPES = [
     "salary",
     "other_income",
@@ -66,64 +63,103 @@ CONSUMPTION_TRANSACTION_TYPES = [
 ]
 
 # Categories where category-level data does not establish whether a purchase
-# is essential. Do not silently force these into mandatory or flexible baskets.
-NEEDS_CONFIRMATION_CATEGORIES = [
-    "Health",
-    "Home & Tech",
-]
 
-# Behavioral evidence from the 24-month dataset audit (Oct 2024-Sep 2026).
-# These are recurrence signals only. They must not be used as essentiality
-# labels or as automatic spending-basket assignments.
-#
-# "strong_recurring_candidate":
-#   Relatively frequent repeat purchases and stronger recurrence/streak evidence.
-# "moderate_recurring_candidate":
-#   Some repeat behavior, but weaker or more mixed recurrence evidence.
-# "mostly_episodic":
-#   Longer median gaps and predominantly short active-month streaks.
-#
-# MCC codes are strings because the database column is text and may be NULL.
-MCC_BEHAVIORAL_SIGNALS = {
-    "Health": {
-        "5912": "strong_recurring_candidate",
-        "8011": "moderate_recurring_candidate",
-        "8021": "mostly_episodic",
-        "8099": "mostly_episodic",
-        None: "unclassified_missing_mcc",
-    },
-    "Home & Tech": {
-        "5200": "strong_recurring_candidate",
-        "5251": "moderate_recurring_candidate",
-        "5712": "moderate_recurring_candidate",
-        "5732": "moderate_recurring_candidate",
-        "5734": "mostly_episodic",
-        None: "unclassified_missing_mcc",
-    },
-}
-
-# Customer-confirmed purpose should take precedence over behavioral signals.
-# Suggested values for a future customer profile / transaction annotation:
-CUSTOMER_ESSENTIALITY_VALUES = [
-    "essential",
-    "optional",
-    "needs_review",
-]
-
-# Salary Sweep is a distinct recurring outgoing flow closely associated with
-# salary, but its destination/purpose is unknown. Do not classify it as
-# consumption, savings, an internal transfer, or investment without evidence.
 UNCLASSIFIED_FINANCIAL_FLOW_NOTES = {
     "salary_sweep": (
         "Recurring salary-linked outgoing flow; destination and purpose unknown."
     ),
 }
 
+_R, _U, _E = BASKET_KEYS
 
-def get_mcc_behavioral_signal(category, mcc_code):
-    """Return a descriptive recurrence signal, or None if no rule exists."""
-    category_signals = MCC_BEHAVIORAL_SIGNALS.get(category, {})
-    return category_signals.get(mcc_code)
+# Bills and other non-card spending: placed by category.
+CATEGORY_BASKETS = {
+    "Housing": _R,
+    "Utilities": _R,
+}
+
+# Card purchases: placed by merchant category code. MCC codes are strings
+# because the database column is text. Labels are what the customer sees.
+MERCHANT_TYPES = {
+    # Groceries
+    "5411": ("supermarket", _R),
+    "5422": ("butcher", _R),
+    "5451": ("dairy shop", _R),
+    "5499": ("convenience / specialty food", _E),
+    # Transportation
+    "5542": ("fuel", _R),
+    "5541": ("service station", _R),
+    "7523": ("parking", _R),
+    "4111": ("public transport", _R),
+    "4121": ("taxi", _E),
+    # Health
+    "5912": ("pharmacy", _R),
+    "8011": ("doctor", _U),
+    "8021": ("dentist", _U),
+    "8099": ("medical services", _U),
+    # Home & Tech
+    "5200": ("home supply store", _U),
+    "5251": ("hardware store", _U),
+    "5732": ("electronics", _U),
+    "5712": ("furniture", _U),
+    "5734": ("software", _U),
+    # Restaurants
+    "5812": ("restaurant", _E),
+    "5813": ("bar", _E),
+    "5814": ("fast food / café", _E),
+    # Entertainment
+    "7922": ("tickets / events", _E),
+    "7999": ("recreation", _E),
+    "7832": ("cinema", _E),
+    "7991": ("attractions", _E),
+    "7996": ("amusement park", _E),
+    # Lifestyle
+    "5941": ("sporting goods", _E),
+    "5651": ("clothing", _E),
+    "5691": ("clothing", _E),
+    "5999": ("other retail", _E),
+    "5942": ("bookstore", _E),
+    "5945": ("hobby / toys", _E),
+    # Travel
+    "4722": ("travel agency", _E),
+    "4511": ("airline", _E),
+    "7011": ("hotel", _E),
+    "7512": ("car rental", _E),
+}
+
+OTHER_MERCHANT_TYPE = "other"
+BILL = "bill"  # non-card spending (Housing, Utilities): there is no merchant
+
+# Card purchases without an MCC: the basket most of the category's known
+# merchant types belong to (shares from DATA.md).
+OTHER_BASKETS = {
+    "Groceries": _R,
+    "Transportation": _R,   # ~89% of known transport is fuel, parking, public transport
+    "Health": _R,           # pharmacy is ~62% of known health purchases
+    "Home & Tech": _U,
+    "Restaurants": _E,
+    "Entertainment": _E,
+    "Lifestyle": _E,
+    "Travel": _E,
+}
+
+# Median purchase per category across all customers (DATA.md, Oct 2024 - Sep
+# 2026). A purchase of LARGE_PURCHASE_FACTOR times the median or more is large.
+CATEGORY_MEDIAN_EUR = {
+    "Groceries": Decimal("64.06"),
+    "Restaurants": Decimal("23.49"),
+    "Transportation": Decimal("41.26"),
+    "Entertainment": Decimal("35.20"),
+    "Health": Decimal("53.85"),
+    "Home & Tech": Decimal("111.08"),
+    "Lifestyle": Decimal("103.31"),
+    "Travel": Decimal("129.66"),
+}
+LARGE_PURCHASE_FACTOR = 10
+
+# Categories where a large purchase is an unexpected necessity (a dentist
+# bill, a new washing machine). Elsewhere a large purchase is only "unusual".
+LARGE_IS_UNEXPECTED = {"Health", "Home & Tech"}
 
 
 def is_consumption_transaction(transaction_type):
@@ -131,45 +167,51 @@ def is_consumption_transaction(transaction_type):
     return transaction_type in CONSUMPTION_TRANSACTION_TYPES
 
 
-# Keys of the baskets reported to the customer. "needs_review" holds spending
-# we cannot honestly place yet (Health, Home & Tech, unknown categories).
-BASKET_KEYS = (
-    "mandatory_regular",
-    "mandatory_irregular",
-    "everyday_flexible",
-    "needs_review",
-)
+def merchant_type(mcc_code, category=None):
+    """Customer-facing merchant type: "bill" for bill categories, "other" when the MCC is missing or unknown."""
+    if category in CATEGORY_BASKETS:
+        return BILL
+    entry = MERCHANT_TYPES.get(mcc_code)
+    return entry[0] if entry else OTHER_MERCHANT_TYPE
 
 
-def classify_category(category, customer_essentiality=None):
-    """
-    Return the basket key for a consumption category.
-
-    Categories listed in SPENDING_BASKETS map directly. Health and Home & Tech
-    follow the customer's confirmed purpose ("essential" -> mandatory_irregular,
-    "optional" -> everyday_flexible). Without that confirmation, and for any
-    category we do not recognise, the answer is "needs_review" rather than a
-    guess. Customer confirmation is ignored for categories that already have a
-    fixed basket.
-    """
-    for basket, categories in SPENDING_BASKETS.items():
-        if category in categories:
-            return basket
-
-    if category in NEEDS_CONFIRMATION_CATEGORIES:
-        if customer_essentiality == "essential":
-            return "mandatory_irregular"
-        if customer_essentiality == "optional":
-            return "everyday_flexible"
-
-    return "needs_review"
+def times_usual(category, amount_eur):
+    """How many times the category's median purchase this amount is, or None if unknown."""
+    median = CATEGORY_MEDIAN_EUR.get(category)
+    if not median:
+        return None
+    return Decimal(str(amount_eur)) / median
 
 
-def classify_transaction(category, transaction_type, customer_essentiality=None):
-    """Return the basket key for one transaction, or None if it is not consumption."""
+def is_large_purchase(category, amount_eur):
+    ratio = times_usual(category, amount_eur)
+    return ratio is not None and ratio >= LARGE_PURCHASE_FACTOR
+
+
+def classify_purchase(category, mcc_code, amount_eur, basket_overrides=None):
+    """Return the basket key for one consumption transaction (rules 2-5 above)."""
+    override = (basket_overrides or {}).get(category)
+    if override in BASKET_KEYS:
+        return override
+
+    if category in CATEGORY_BASKETS:
+        return CATEGORY_BASKETS[category]
+
+    if category in LARGE_IS_UNEXPECTED and is_large_purchase(category, amount_eur):
+        return _U
+
+    entry = MERCHANT_TYPES.get(mcc_code)
+    if entry:
+        return entry[1]
+
+    return OTHER_BASKETS.get(category, UNCLASSIFIED)
+
+
+def classify_transaction(category, transaction_type, mcc_code=None, amount_eur=0, basket_overrides=None):
+    """Return the basket key for any transaction, or None if it is not consumption."""
     if not is_consumption_transaction(transaction_type):
         return None
-    return classify_category(category, customer_essentiality)
+    return classify_purchase(category, mcc_code, amount_eur, basket_overrides)
 
 
 def _eur(value):
@@ -177,49 +219,101 @@ def _eur(value):
     return float(value.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP))
 
 
-def summarize_baskets(category_rows, essentiality_by_category=None):
+def summarize_baskets(transactions, basket_overrides=None):
     """
-    Group per-category spending rows into the product baskets.
+    Group consumption transactions into the baskets.
 
-    ``category_rows`` are rows shaped like the output of
-    ``spending_by_category`` (``category``, ``total_spending_eur``,
-    ``transaction_count``) and must already be consumption-only.
-    ``essentiality_by_category`` optionally maps a category name to
-    "essential" or "optional" (see CUSTOMER_ESSENTIALITY_VALUES).
+    ``transactions`` are rows shaped like the output of
+    ``queries.consumption_transactions``: ``tx_date``, ``category``,
+    ``mcc_code`` and ``amount_eur`` (money out as a positive number).
+    ``basket_overrides`` optionally maps a category to the basket key the
+    customer chose for it.
 
-    Every basket key is always present, with zeros when empty.
+    Each basket has its label, total, share, count and categories, each
+    category broken down by merchant type. The three baskets are always
+    present; "unclassified" only when something could not be placed.
+    ``unusual_purchases`` lists large one-off purchases, largest first.
     """
-    overrides = essentiality_by_category or {}
-    totals = {
-        key: {"total": Decimal(0), "count": 0, "categories": []}
-        for key in BASKET_KEYS
-    }
+    totals = {}
+    unusual = []
 
-    for row in category_rows:
+    for row in transactions:
         category = row["category"]
-        amount = Decimal(str(row["total_spending_eur"]))
-        entry = totals[classify_category(category, overrides.get(category))]
-        entry["total"] += amount
-        entry["count"] += row["transaction_count"]
-        entry["categories"].append(
-            {"category": category, "total_eur": _eur(amount)}
-        )
+        amount = Decimal(str(row["amount_eur"]))
+        basket = classify_purchase(category, row["mcc_code"], amount, basket_overrides)
 
-    grand_total = sum((e["total"] for e in totals.values()), Decimal(0))
+        b = totals.setdefault(basket, {"total": Decimal(0), "count": 0, "categories": {}})
+        b["total"] += amount
+        b["count"] += 1
+        c = b["categories"].setdefault(category, {"total": Decimal(0), "types": {}})
+        c["total"] += amount
+        mtype = merchant_type(row["mcc_code"], category)
+        t = c["types"].setdefault(mtype, [Decimal(0), 0])
+        t[0] += amount
+        t[1] += 1
+
+        if is_large_purchase(category, amount):
+            unusual.append({
+                "date": row["tx_date"].isoformat(),
+                "category": category,
+                "merchant_type": mtype,
+                "amount_eur": _eur(amount),
+                "times_usual": float(times_usual(category, amount).quantize(Decimal("0.1"))),
+                "basket": basket,
+            })
+
+    grand_total = sum((b["total"] for b in totals.values()), Decimal(0))
+    keys = list(BASKET_KEYS) + ([UNCLASSIFIED] if UNCLASSIFIED in totals else [])
 
     baskets = {}
-    for key, entry in totals.items():
-        share = entry["total"] / grand_total * 100 if grand_total else Decimal(0)
+    for key in keys:
+        b = totals.get(key, {"total": Decimal(0), "count": 0, "categories": {}})
+        share = b["total"] / grand_total * 100 if grand_total else Decimal(0)
+        categories = [
+            {
+                "category": name,
+                "total_eur": _eur(c["total"]),
+                "merchant_types": sorted(
+                    ({"merchant_type": m, "total_eur": _eur(v[0]), "transaction_count": v[1]}
+                     for m, v in c["types"].items()),
+                    key=lambda m: m["total_eur"], reverse=True,
+                ),
+            }
+            for name, c in b["categories"].items()
+        ]
         baskets[key] = {
-            "total_eur": _eur(entry["total"]),
+            "label": BASKET_LABELS.get(key, "Unclassified"),
+            "total_eur": _eur(b["total"]),
             "share_pct": float(share.quantize(Decimal("0.1"), rounding=ROUND_HALF_UP)),
-            "transaction_count": entry["count"],
-            "categories": sorted(
-                entry["categories"], key=lambda c: c["total_eur"], reverse=True
-            ),
+            "transaction_count": b["count"],
+            "categories": sorted(categories, key=lambda c: c["total_eur"], reverse=True),
         }
 
-    return {"baskets": baskets, "total_spending_eur": _eur(grand_total)}
+    return {
+        "baskets": baskets,
+        "total_spending_eur": _eur(grand_total),
+        "unusual_purchases": sorted(unusual, key=lambda u: u["amount_eur"], reverse=True),
+    }
+
+
+def merchant_breakdown(transactions, category):
+    """Spending in one category per merchant type, with each type's basket, largest first."""
+    types = {}
+    for row in transactions:
+        if row["category"] != category:
+            continue
+        amount = Decimal(str(row["amount_eur"]))
+        mtype = merchant_type(row["mcc_code"], category)
+        t = types.setdefault(mtype, {"total": Decimal(0), "count": 0, "baskets": set()})
+        t["total"] += amount
+        t["count"] += 1
+        t["baskets"].add(classify_purchase(category, row["mcc_code"], amount))
+    return sorted(
+        ({"merchant_type": m, "total_eur": _eur(t["total"]), "transaction_count": t["count"],
+          "baskets": sorted(t["baskets"])}
+         for m, t in types.items()),
+        key=lambda m: m["total_eur"], reverse=True,
+    )
 
 
 def salary_sweep_info(flow_rows):

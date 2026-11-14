@@ -22,6 +22,7 @@ EXPECTED_TOOLS = {
     "get_spending_by_category",
     "get_basket_summary",
     "get_monthly_balance_trend",
+    "get_transactions",
     "calculate_prorated_amount",
     "calculate_safe_to_spend",
     "calculate_safe_to_save",
@@ -140,6 +141,36 @@ def test_spending_tool_rejects_bad_dates(tools, monkeypatch, arguments):
         tools["get_spending_by_category"].run(arguments)
 
 
+def test_spending_tool_breaks_a_category_down_by_merchant_type(tools, monkeypatch):
+    monkeypatch.setattr(
+        queries,
+        "consumption_transactions",
+        lambda *args: [
+            {"tx_date": date(2026, 1, 5), "category": "Transportation", "mcc_code": "4121", "amount_eur": Decimal("90.00")},
+            {"tx_date": date(2026, 1, 6), "category": "Transportation", "mcc_code": "4111", "amount_eur": Decimal("45.00")},
+            {"tx_date": date(2026, 1, 7), "category": "Restaurants", "mcc_code": "5812", "amount_eur": Decimal("20.00")},
+        ],
+    )
+
+    result = run(tools, "get_spending_by_category", {**Q1, "category": "Transportation"})
+
+    assert result["category"] == "Transportation"
+    assert result["total_eur"] == 135.0
+    assert result["merchant_types"][0] == {
+        "merchant_type": "taxi",
+        "total_eur": 90.0,
+        "transaction_count": 1,
+        "baskets": ["everyday_spending"],
+        "monthly_average_eur": 30.44,
+    }
+    assert result["merchant_types"][1]["baskets"] == ["regular_essentials"]
+
+
+def test_spending_tool_rejects_an_unknown_category(tools):
+    with pytest.raises(ValueError):
+        tools["get_spending_by_category"].run({**Q1, "category": "Taxis"})
+
+
 # --------------------------------------------------------------------------
 # get_basket_summary
 # --------------------------------------------------------------------------
@@ -147,10 +178,10 @@ def test_spending_tool_rejects_bad_dates(tools, monkeypatch, arguments):
 def test_basket_tool_adds_averages_and_sweep_warning(tools, monkeypatch):
     monkeypatch.setattr(
         queries,
-        "spending_by_category",
+        "consumption_transactions",
         lambda *args: [
-            {"category": "Housing", "total_spending_eur": Decimal("900.00"), "transaction_count": 3},
-            {"category": "Groceries", "total_spending_eur": Decimal("90.00"), "transaction_count": 9},
+            {"tx_date": date(2026, 1, 5), "category": "Housing", "mcc_code": None, "amount_eur": Decimal("900.00")},
+            {"tx_date": date(2026, 1, 9), "category": "Restaurants", "mcc_code": "5812", "amount_eur": Decimal("90.00")},
         ],
     )
     monkeypatch.setattr(
@@ -167,9 +198,10 @@ def test_basket_tool_adds_averages_and_sweep_warning(tools, monkeypatch):
     assert result["period"]["days"] == 90
     assert result["total_spending_eur"] == 990.0
     assert result["monthly_average_eur"] == 334.81
-    assert result["baskets"]["mandatory_regular"]["monthly_average_eur"] == 304.38
-    assert result["baskets"]["everyday_flexible"]["monthly_average_eur"] == 30.44
-    assert result["baskets"]["mandatory_regular"]["categories"][0]["monthly_average_eur"] == 304.38
+    assert result["baskets"]["regular_essentials"]["monthly_average_eur"] == 304.38
+    assert result["baskets"]["everyday_spending"]["monthly_average_eur"] == 30.44
+    assert result["baskets"]["regular_essentials"]["categories"][0]["monthly_average_eur"] == 304.38
+    assert result["baskets"]["regular_essentials"]["label"] == "🏠 Regular essentials"
 
     flows = {f["transaction_type"]: f for f in result["financial_flows"]}
     assert flows["salary"]["monthly_average_eur"] == 1014.58  # 3000 * 30.4375 / 90
@@ -181,7 +213,7 @@ def test_basket_tool_adds_averages_and_sweep_warning(tools, monkeypatch):
 
 
 def test_basket_tool_without_sweeps_has_no_warning(tools, monkeypatch):
-    monkeypatch.setattr(queries, "spending_by_category", lambda *args: [])
+    monkeypatch.setattr(queries, "consumption_transactions", lambda *args: [])
     monkeypatch.setattr(queries, "financial_flows", lambda *args: [])
 
     result = run(tools, "get_basket_summary", Q1)
@@ -324,3 +356,40 @@ def test_what_if_tool_rejects_unknown_category(tools):
         tools["calculate_what_if"].run(
             {"monthly_by_category": {"Restaurants": 235}, "reductions_pct": {"Dining": 20}}
         )
+
+
+# --------------------------------------------------------------------------
+# get_transactions
+# --------------------------------------------------------------------------
+
+def test_transactions_tool_formats_rows(tools, monkeypatch):
+    from datetime import datetime
+    seen = []
+
+    def fake(customer_id, start, end, category=None, order="largest", limit=20):
+        seen.append((customer_id, category, order, limit))
+        return [
+            {"tx_timestamp": datetime(2026, 3, 2, 18, 30, 5), "category": "Transportation",
+             "transaction_type": "purchase", "mcc_code": "4121",
+             "amount_eur": Decimal("-41.27"), "balance_after_eur": Decimal("1200.00")},
+            {"tx_timestamp": datetime(2026, 3, 1, 8, 0), "category": "Housing",
+             "transaction_type": "housing_payment", "mcc_code": None,
+             "amount_eur": Decimal("-900.00"), "balance_after_eur": Decimal("1241.27")},
+            {"tx_timestamp": datetime(2026, 3, 15, 9, 0), "category": "Salary",
+             "transaction_type": "salary", "mcc_code": None,
+             "amount_eur": Decimal("3000.00"), "balance_after_eur": Decimal("4241.27")},
+        ]
+
+    monkeypatch.setattr(queries, "list_transactions", fake)
+    result = run(tools, "get_transactions", {**Q1, "order": "latest", "limit": 3.0})
+
+    assert seen == [("CUST42", None, "latest", 3)]
+    assert result["transactions"][0] == {
+        "timestamp": "2026-03-02T18:30",
+        "category": "Transportation",
+        "merchant_type": "taxi",
+        "amount_eur": -41.27,
+        "balance_after_eur": 1200.0,
+    }
+    assert result["transactions"][1]["merchant_type"] == "bill"
+    assert result["transactions"][2]["merchant_type"] is None  # income, not spending

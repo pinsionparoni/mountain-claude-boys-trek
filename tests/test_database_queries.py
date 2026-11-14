@@ -42,6 +42,9 @@ class FakeCursor:
     def fetchall(self):
         return self.rows
 
+    def fetchone(self):
+        return self.rows[0] if self.rows else None
+
 
 class FakeConnection:
     def __init__(self, cursor):
@@ -135,8 +138,8 @@ def test_financial_flows_validates_input(fake_db):
 def test_basket_summary_separates_spending_from_flows(fake_db):
     fake_db.queue(
         [
-            {"category": "Housing", "total_spending_eur": 900, "transaction_count": 3},
-            {"category": "Groceries", "total_spending_eur": 100, "transaction_count": 9},
+            {"tx_date": date(2026, 1, 5), "category": "Housing", "mcc_code": None, "amount_eur": 900},
+            {"tx_date": date(2026, 1, 9), "category": "Restaurants", "mcc_code": "5812", "amount_eur": 100},
         ],
         [
             {"transaction_type": "salary", "net_amount_eur": 3000, "transaction_count": 3},
@@ -148,8 +151,9 @@ def test_basket_summary_separates_spending_from_flows(fake_db):
 
     # Spending baskets hold consumption only; flows never leak in.
     assert result["total_spending_eur"] == 1000.0
-    assert result["baskets"]["mandatory_regular"]["total_eur"] == 900.0
-    assert result["baskets"]["everyday_flexible"]["total_eur"] == 100.0
+    assert result["baskets"]["regular_essentials"]["total_eur"] == 900.0
+    assert result["baskets"]["everyday_spending"]["total_eur"] == 100.0
+    assert result["unusual_purchases"] == []
 
     flows = {f["transaction_type"]: f for f in result["financial_flows"]}
     assert flows["salary"]["net_amount_eur"] == 3000.0
@@ -165,15 +169,16 @@ def test_basket_summary_separates_spending_from_flows(fake_db):
     assert result["period"] == {"start_date": "2026-01-01", "end_date": "2026-03-31"}
 
 
-def test_basket_summary_passes_customer_confirmation_through(fake_db):
+def test_basket_summary_passes_customer_overrides_through(fake_db):
     fake_db.queue(
-        [{"category": "Health", "total_spending_eur": 300, "transaction_count": 3}],
+        [{"tx_date": date(2026, 2, 1), "category": "Health", "mcc_code": "8021", "amount_eur": 300}],
         [],
     )
     result = queries.basket_summary(
-        "CUST1", START, END, essentiality_by_category={"Health": "essential"}
+        "CUST1", START, END, basket_overrides={"Health": "regular_essentials"}
     )
-    assert result["baskets"]["mandatory_irregular"]["total_eur"] == 300.0
+    assert result["baskets"]["regular_essentials"]["total_eur"] == 300.0
+    assert result["baskets"]["unexpected_necessities"]["total_eur"] == 0.0
     assert result["financial_flows"] == []
     assert result["has_salary_sweep"] is False
     assert result["salary_sweep_note"] is None
@@ -202,3 +207,53 @@ def test_balance_trend_validates_months(fake_db, months):
 def test_balance_trend_requires_customer(fake_db):
     with pytest.raises(ValueError):
         queries.monthly_balance_trend("", months=6)
+
+
+# --------------------------------------------------------------------------
+# consumption_transactions, list_transactions, customer_profile
+# --------------------------------------------------------------------------
+
+def test_consumption_transactions_only_counts_known_consumption_types(fake_db):
+    fake_db.queue([])
+    queries.consumption_transactions("CUST1", START, END)
+    query, params = fake_db.cursors[0].calls[0]
+    assert params == ("CUST1", START, END, CONSUMPTION_TRANSACTION_TYPES)
+    assert "-tx_amount_eur AS amount_eur" in query
+    assert "mcc_code" in query
+
+
+def test_consumption_transactions_validates_input(fake_db):
+    with pytest.raises(ValueError):
+        queries.consumption_transactions("", START, END)
+    with pytest.raises(ValueError):
+        queries.consumption_transactions("CUST1", END, START)
+
+
+@pytest.mark.parametrize("order, clause", [("largest", "tx_amount_eur ASC"), ("latest", "tx_timestamp DESC")])
+def test_list_transactions_orders_and_filters(fake_db, order, clause):
+    fake_db.queue([])
+    queries.list_transactions("CUST1", START, END, category="Travel", order=order, limit=5)
+    query, params = fake_db.cursors[0].calls[0]
+    assert clause in query
+    assert params == ("CUST1", START, END, "Travel", "Travel", 5)
+
+
+@pytest.mark.parametrize("kwargs", [{"order": "random"}, {"limit": 0}, {"limit": 51}])
+def test_list_transactions_validates_input(fake_db, kwargs):
+    with pytest.raises(ValueError):
+        queries.list_transactions("CUST1", START, END, **kwargs)
+
+
+def test_customer_profile(fake_db):
+    fake_db.queue([{"age": 63, "postal_code": "00990", "data_from": date(2024, 10, 3),
+                    "data_to": date(2026, 9, 30), "balance_eur": 4723.581}])
+    assert queries.customer_profile("CUST00001") == {
+        "customer_id": "CUST00001", "age": 63, "postal_code": "00990",
+        "data_from": "2024-10-03", "data_to": "2026-09-30", "balance_eur": 4723.58,
+    }
+
+
+def test_customer_profile_unknown_customer(fake_db):
+    fake_db.queue([])
+    with pytest.raises(ValueError, match="Unknown customer"):
+        queries.customer_profile("CUST99999")

@@ -109,26 +109,123 @@ def financial_flows(
             return cur.fetchall()
 
 
+def consumption_transactions(
+    customer_id: str,
+    start_date: date,
+    end_date: date,
+) -> list[dict]:
+    """
+    Return a customer's individual consumption transactions in a period.
+
+    Rows have ``tx_date``, ``category``, ``mcc_code`` (None for non-card
+    payments) and ``amount_eur``: money out as a positive number. Only
+    CONSUMPTION_TRANSACTION_TYPES count. A customer has about 30 a month, so
+    fetching them lets coach/spending_baskets.py classify each one by merchant
+    type and size. Dates are inclusive.
+    """
+    _validate_customer_and_dates(customer_id, start_date, end_date)
+
+    query = """
+        SELECT
+            tx_date,
+            COALESCE(category, 'Uncategorized') AS category,
+            mcc_code,
+            -tx_amount_eur AS amount_eur
+        FROM transactions
+        WHERE customer_id = %s
+          AND tx_date >= %s
+          AND tx_date <= %s
+          AND tx_amount_eur < 0
+          AND transaction_type = ANY(%s)
+        ORDER BY tx_date, id;
+    """
+
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                query,
+                (
+                    customer_id,
+                    start_date,
+                    end_date,
+                    CONSUMPTION_TRANSACTION_TYPES,
+                ),
+            )
+            return cur.fetchall()
+
+
+def list_transactions(
+    customer_id: str,
+    start_date: date,
+    end_date: date,
+    category: str | None = None,
+    order: str = "largest",
+    limit: int = 20,
+) -> list[dict]:
+    """
+    Return a customer's individual transactions: the largest money out first,
+    or the latest first (``order="latest"``). Optionally one category only.
+
+    Rows have ``tx_timestamp``, ``category``, ``transaction_type``,
+    ``mcc_code``, ``amount_eur`` (signed, negative is money out) and
+    ``balance_after_eur``. Dates are inclusive; ``limit`` is 1 to 50.
+    """
+    _validate_customer_and_dates(customer_id, start_date, end_date)
+
+    if order not in ("largest", "latest"):
+        raise ValueError('order must be "largest" or "latest"')
+    if not 1 <= limit <= 50:
+        raise ValueError("limit must be between 1 and 50")
+
+    # Both ORDER BY clauses are fixed strings, never user input.
+    order_by = "tx_amount_eur ASC" if order == "largest" else "tx_timestamp DESC, id DESC"
+    query = f"""
+        SELECT
+            tx_timestamp,
+            category,
+            transaction_type,
+            mcc_code,
+            tx_amount_eur AS amount_eur,
+            balance_after_eur
+        FROM transactions
+        WHERE customer_id = %s
+          AND tx_date >= %s
+          AND tx_date <= %s
+          AND (%s::text IS NULL OR category = %s)
+        ORDER BY {order_by}
+        LIMIT %s;
+    """
+
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                query,
+                (customer_id, start_date, end_date, category, category, limit),
+            )
+            return cur.fetchall()
+
+
 def basket_summary(
     customer_id: str,
     start_date: date,
     end_date: date,
-    essentiality_by_category: dict | None = None,
+    basket_overrides: dict | None = None,
 ) -> dict:
     """
     Return a customer's consumption grouped into the spending baskets.
 
-    The result has ``baskets`` (with totals, shares and per-category
-    breakdown), ``total_spending_eur``, and ``financial_flows``: income,
+    The result has ``baskets`` (with labels, totals, shares and a
+    per-category, per-merchant-type breakdown), ``total_spending_eur``,
+    ``unusual_purchases`` and ``financial_flows``: income,
     salary sweeps and investment movements, reported separately so they are
     visible but never counted as spending. ``has_salary_sweep``,
     ``swept_share_of_salary_pct`` and ``salary_sweep_note`` warn when salary
     leaves the account, which can hide mandatory costs.
     """
-    category_rows = spending_by_category(customer_id, start_date, end_date)
+    transactions = consumption_transactions(customer_id, start_date, end_date)
     flow_rows = financial_flows(customer_id, start_date, end_date)
 
-    summary = summarize_baskets(category_rows, essentiality_by_category)
+    summary = summarize_baskets(transactions, basket_overrides)
     summary["financial_flows"] = [
         {
             "transaction_type": row["transaction_type"],

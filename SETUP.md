@@ -229,15 +229,16 @@ Each tool is bound to the customer the app chose when the tools were created; no
 
 | Tool | Answers questions like |
 |---|---|
-| `get_spending_by_category` | "How much did I spend on restaurants?" Spending per category with totals, monthly averages and counts. |
-| `get_basket_summary` | "Where did my money go?" Spending in the three baskets with shares and categories, plus income, savings and salary sweeps shown separately. |
+| `get_spending_by_category` | "How much did I spend on restaurants?" Spending per category with totals, monthly averages and counts. With a category: "How much on taxis?", that category split by merchant type. |
+| `get_basket_summary` | "Where did my money go?" Spending in 🏠 🔧 ☕ with shares, categories and merchant types, large one-off purchases, and income, savings and salary sweeps shown separately. |
 | `get_monthly_balance_trend` | "How has my balance changed?" End-of-month balance for recent months. |
+| `get_transactions` | "What were my biggest purchases?" The largest or latest transactions, optionally for one category. |
 | `calculate_prorated_amount` | Part of a monthly amount that falls in a number of days. |
 | `calculate_safe_to_spend` | "What can I safely spend this week?" |
 | `calculate_safe_to_save` | "How much could I save each month?" |
 | `calculate_what_if` | "How much would I save if I cut dining out by 20%?" |
 
-Basket rules: [BASKETS.md](BASKETS.md).
+Basket rules: [BASKETS.md](BASKETS.md), implemented in `coach/spending_baskets.py`.
 
 ### How a chat turn works
 
