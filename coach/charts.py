@@ -119,6 +119,7 @@ def peers(customer_id: str, today: date, category: str | None = None) -> dict:
                     "spends_more_than_pct": g["spends_more_than_pct_of_peers"],
                     "spends_less_than_pct": g["spends_less_than_pct_of_peers"]}
 
+        finland = row.get("finland")
         return {
             "type": "peer_range",
             "category": category,
@@ -127,9 +128,13 @@ def peers(customer_id: str, today: date, category: str | None = None) -> dict:
             "me": row["my_monthly"],
             "age": group(row["age_group"]),
             "everyone": group(row["everyone"]),
+            # Statistics Finland's average for the same age and for all ages, if the category maps.
+            "finland": {"age": finland["age_group_monthly"], "all": finland["all_ages_monthly"]} if finland else None,
+            "finland_source": result["finland_source"] if finland else None,
         }
     rows = [
-        {"category": c, "me": r["my_monthly"], "peer_median": r["age_group"]["peer_median_monthly"]}
+        {"category": c, "me": r["my_monthly"], "peer_median": r["age_group"]["peer_median_monthly"],
+         "finland": r["finland"]["age_group_monthly"] if "finland" in r else None}
         for c, r in result["by_category"].items()
         if c not in result["not_in_profile"]
     ]
@@ -140,6 +145,7 @@ def peers(customer_id: str, today: date, category: str | None = None) -> dict:
         "period": result["period"],
         "items": rows[:MAX_BARS],
         "left_out": result["not_in_profile"],
+        "finland_source": result["finland_source"] if any(r["finland"] is not None for r in rows[:MAX_BARS]) else None,
     }
 
 

@@ -74,9 +74,10 @@ def test_peers_chart_leaves_bills_out_and_keeps_only_aggregates(monkeypatch):
     })
     chart = charts.peers("CUST00001", TODAY)
     assert chart["items"] == [
-        {"category": "Groceries", "me": 200.0, "peer_median": 260.0},
-        {"category": "Travel", "me": 10.0, "peer_median": 25.0},
+        {"category": "Groceries", "me": 200.0, "peer_median": 260.0, "finland": None},
+        {"category": "Travel", "me": 10.0, "peer_median": 25.0, "finland": None},
     ]
+    assert chart["finland_source"] is None
 
 
 def test_tool_picks_the_period_and_returns_the_chart(monkeypatch):

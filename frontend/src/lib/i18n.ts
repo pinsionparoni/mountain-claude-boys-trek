@@ -143,6 +143,9 @@ export const text = {
       typicalRange: "Typical range (middle half)",
       medianMark: "Median",
       rangeNote: (period: string) => `Average per month, ${period}.`,
+      finlandMark: "Finnish average (Statistics Finland)",
+      finlandSource: (year: number) =>
+        `Finnish average: Statistics Finland, Household Budget Survey ${year}, per consumption unit, at 2025–26 prices (CC BY 4.0).`,
       tableCaption: "The chart's figures",
     },
     chatTitle: "Ask your coach",
@@ -307,6 +310,9 @@ export const text = {
       typicalRange: "Tavallinen vaihteluväli (keskimmäinen puolet)",
       medianMark: "Mediaani",
       rangeNote: (period: string) => `Keskimäärin kuukaudessa ${period}.`,
+      finlandMark: "Suomen keskiarvo (Tilastokeskus)",
+      finlandSource: (year: number) =>
+        `Suomen keskiarvo: Tilastokeskus, kulutustutkimus ${year}, kulutusyksikköä kohden, vuosien 2025–26 hinnoin (CC BY 4.0).`,
       tableCaption: "Kaavion luvut",
     },
     chatTitle: "Kysy valmentajalta",

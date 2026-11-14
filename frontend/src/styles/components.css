@@ -1029,3 +1029,20 @@ html, body, #root { block-size: 100%; overflow: hidden; }
 .swatch--dot { inline-size: 10px; block-size: 10px; border-radius: 50%; background: var(--chart-series); }
 .swatch--tick { inline-size: 2px; block-size: 12px; border-radius: 1px; background: var(--chart-peer); }
 .swatch--band { background: rgb(138 145 141 / 0.28); }
+
+/* Statistics Finland's average: a small dark diamond, a shape of its own so it
+   never reads as the customer's dot or the peers' median tick. */
+.hbar-track { position: relative; }
+.mark-finland {
+  position: absolute;
+  inset-block-start: 50%;
+  inline-size: 9px;
+  block-size: 9px;
+  margin: -4.5px 0 0 -4.5px;
+  transform: rotate(45deg);
+  border-radius: 1.5px;
+  background: var(--sp-neutral-stronger);
+  box-shadow: 0 0 0 1.5px var(--sp-white);
+}
+.swatch--finland { inline-size: 8px; block-size: 8px; border-radius: 1.5px; transform: rotate(45deg); background: var(--sp-neutral-stronger); }
+.chat-chart-source { font-size: 0.72rem; }

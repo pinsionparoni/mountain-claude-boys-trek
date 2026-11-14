@@ -73,9 +73,19 @@ export type ChartSpec =
   | { type: "balance"; points: { month: string; value: number }[]; today: string }
   | { type: "budget"; today: string; baskets: { basket: BasketKey; spent: number; reference: number }[] }
   | { type: "peers"; age_group: string; period: { start_date: string; end_date: string };
-      items: { category: string; me: number; peer_median: number }[]; left_out: string[] }
+      items: { category: string; me: number; peer_median: number; finland: number | null }[]; left_out: string[];
+      finland_source: FinlandSource | null }
   | { type: "peer_range"; category: string; age_group: string; period: { start_date: string; end_date: string };
-      me: number; age: PeerGroup; everyone: PeerGroup };
+      me: number; age: PeerGroup; everyone: PeerGroup;
+      finland: { age: number; all: number } | null; finland_source: FinlandSource | null };
+
+/** Statistics Finland's open benchmark (coach/statfin.py). */
+export interface FinlandSource {
+  publisher: string;
+  licence: string;
+  survey_year: number;
+  price_level: string;
+}
 
 export interface PeerGroup {
   median: number;

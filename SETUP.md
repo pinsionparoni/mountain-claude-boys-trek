@@ -326,6 +326,8 @@ flowchart LR
 | `frontend/` | React + Vite mobile web app (see step 10) |
 | `scripts/load_data.py` | Loads `data/*.csv` into PostgreSQL (`DATABASE_URL`) |
 | `scripts/profile_data.py` | Regenerates [DATA.md](DATA.md) from the CSVs |
+| `scripts/fetch_statfin.py` | Downloads Statistics Finland's household spending by age and writes `coach/statfin_data.py` (the open benchmark). Re-run to refresh; the app itself never calls Statistics Finland |
+| `coach/statfin.py`, `coach/statfin_data.py` | The open benchmark: Finnish average spending per consumption unit by age, for Groceries, Restaurants, Transportation, Health and Entertainment (CC BY 4.0, "Source: Statistics Finland") |
 | `scripts/audits/` | One-off data audits against the live database |
 | `tests/` | Unit tests |
 | `requirements.txt` | Python dependencies |

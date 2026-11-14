@@ -21,7 +21,7 @@ Full brief: [CHALLENGE.md](CHALLENGE.md)
 - **"What kind of spender am I?":** compares your spending with people your age (Statistics Finland's age bands) and with everyone, per category and per basket: "you spend less on travel than 85% of people aged 18–24". Only medians and ranks are used, never another customer's data.
 - **Computes, doesn't guess:** every number comes from code run on your own transactions; the AI only explains it.
 - **Keeps customer data in Europe:** stored in Frankfurt, processed on our own server in the EU, and answered by Google's open Gemma 4 model on our own Verda server in Finland instead of an outside AI service. One hop isn't in the EU, and we say so: see [Where the data goes](#where-the-data-goes).
-- **Optional benchmarks** from open sources such as Statistics Finland, without ever sending personal data to a search engine.
+- **Open-data benchmarks:** your spending next to **Statistics Finland's** figures for Finnish households your age (household budget survey 2022, per consumption unit, at today's prices), as well as the bank's own customers. The two can tell different stories, and the coach says so: "typical among our customers your age, but 81% above the Finnish average". The figures are stored in the app; nothing about you is sent anywhere.
 
 ## How it works
 
@@ -78,6 +78,7 @@ In short: **the data is stored, processed and handled by the AI model in the EU,
 | **Aiven PostgreSQL** | The S-Pankki synthetic dataset: 5,100 customers, 3.6M transactions |
 | **Modal** | Hosts the demo app and coach API in its EU region; secure sandboxes for calculations *(planned)* |
 | **Claude** | Development and quality baseline |
+| **Statistics Finland** open data | Household spending by age (StatFin tables 14q4, 14q9) and the consumer price index (11xs), CC BY 4.0. Source: Statistics Finland |
 | **Exa** | Optional web search for public benchmarks |
 
 More detail: [TECH_STACK.md](TECH_STACK.md)

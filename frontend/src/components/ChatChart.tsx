@@ -24,14 +24,15 @@ const period = (start: string, end: string, lang: Lang) =>
 
 const pct = (value: number, max: number) => `${max > 0 ? Math.max((value / max) * 100, value > 0 ? 1 : 0) : 0}%`;
 
-function Frame({ title, note, legend, rows, t, children }:
-  { title: string; note?: string; legend?: ReactNode; rows: Row[]; t: Text; children: ReactNode }) {
+function Frame({ title, note, source, legend, rows, t, children }:
+  { title: string; note?: string; source?: string; legend?: ReactNode; rows: Row[]; t: Text; children: ReactNode }) {
   return (
     <figure className="chat-chart">
       <figcaption className="chat-chart-title">{title}</figcaption>
       {legend}
       <div aria-hidden="true">{children}</div>
       {note && <p className="chat-chart-note">{note}</p>}
+      {source && <p className="chat-chart-note chat-chart-source">{source}</p>}
       <table className="visually-hidden">
         <caption>{t.chart.tableCaption}</caption>
         <tbody>{rows.map((r) => <tr key={r.label}><th scope="row">{r.label}</th><td>{r.value}</td></tr>)}</tbody>
@@ -143,24 +144,29 @@ export function ChatChart({ chart, t, lang }: Props) {
       { key: "age", label: c.ageRow(chart.age_group), g: chart.age },
       { key: "everyone", label: c.everyoneRow, g: chart.everyone },
     ];
-    const max = Math.max(chart.me, ...groups.flatMap(({ g }) => [g.typical_high, g.median])) * 1.08 || 1;
+    const finland = { age: chart.finland?.age ?? null, everyone: chart.finland?.all ?? null } as Record<string, number | null>;
+    const max = Math.max(chart.me, ...groups.flatMap(({ g }) => [g.typical_high, g.median]),
+                         ...Object.values(finland).map((v) => v ?? 0)) * 1.08 || 1;
     const at = (v: number) => `${Math.min(v / max, 1) * 100}%`;
     const what = categoryName(chart.category, lang);
     return (
       <Frame t={t} title={c.peerRange(what)}
              note={c.rangeNote(period(chart.period.start_date, chart.period.end_date, lang))}
+             source={chart.finland_source ? c.finlandSource(chart.finland_source.survey_year) : undefined}
              legend={
                <p className="chart-legend">
                  <span><i className="swatch swatch--dot" />{c.you}</span>
                  <span><i className="swatch swatch--tick" />{c.medianMark}</span>
                  <span><i className="swatch swatch--band" />{c.typicalRange}</span>
+                 {chart.finland && <span><i className="swatch swatch--finland" />{c.finlandMark}</span>}
                </p>
              }
              rows={[
                { label: c.you, value: formatMoney(chart.me) },
-               ...groups.flatMap(({ label, g }) => [
+               ...groups.flatMap(({ key, label, g }) => [
                  { label: `${label}: ${c.medianMark}`, value: formatMoney(g.median) },
                  { label: `${label}: ${c.typicalRange}`, value: `${formatMoney(g.typical_low)}–${formatMoney(g.typical_high)}` },
+                 ...(finland[key] !== null ? [{ label: `${label}: ${c.finlandMark}`, value: formatMoney(finland[key]!) }] : []),
                ]),
              ]}>
         <div className="ranges">
@@ -171,6 +177,10 @@ export function ChatChart({ chart, t, lang }: Props) {
                     title={`${c.typicalRange}: ${formatMoney(g.typical_low)}–${formatMoney(g.typical_high)} · ${c.medianMark}: ${formatMoney(g.median)}`}>
                 <span className="range-band" style={{ insetInlineStart: at(g.typical_low), inlineSize: `calc(${at(g.typical_high)} - ${at(g.typical_low)})` }} />
                 <span className="range-median" style={{ insetInlineStart: at(g.median) }} />
+                {finland[key] !== null && (
+                  <span className="mark-finland" style={{ insetInlineStart: at(finland[key]!) }}
+                        title={`${c.finlandMark}: ${formatMoney(finland[key]!)}`} />
+                )}
                 <span className="range-me" style={{ insetInlineStart: at(chart.me) }} title={`${c.you}: ${formatMoney(chart.me)}`} />
               </span>
               <span className="range-figures">
@@ -185,17 +195,20 @@ export function ChatChart({ chart, t, lang }: Props) {
   }
 
   // peers: you (green) against the age group's median (grey); two series, so a legend.
-  const max = Math.max(...chart.items.flatMap((i) => [i.me, i.peer_median]), 0);
+  const max = Math.max(...chart.items.flatMap((i) => [i.me, i.peer_median, i.finland ?? 0]), 0);
   return (
     <Frame t={t} title={c.peers(chart.age_group)} note={c.billsLeftOut}
+           source={chart.finland_source ? c.finlandSource(chart.finland_source.survey_year) : undefined}
            legend={
              <p className="chart-legend">
                <span><i className="swatch swatch--you" />{c.you}</span>
                <span><i className="swatch swatch--peer" />{c.median(chart.age_group)}</span>
+               {chart.finland_source && <span><i className="swatch swatch--finland" />{c.finlandMark}</span>}
              </p>
            }
            rows={chart.items.map((i) => ({ label: categoryName(i.category, lang),
-                                          value: `${c.you} ${formatMoney(i.me)} · ${c.median(chart.age_group)} ${formatMoney(i.peer_median)}` }))}>
+                                          value: `${c.you} ${formatMoney(i.me)} · ${c.median(chart.age_group)} ${formatMoney(i.peer_median)}`
+                                            + (i.finland !== null ? ` · ${c.finlandMark} ${formatMoney(i.finland)}` : "") }))}>
       <div className="pairs">
         {chart.items.map((i) => (
           <div key={i.category} className="pair">
@@ -206,6 +219,10 @@ export function ChatChart({ chart, t, lang }: Props) {
             <span className="hbar-value money">{formatMoney(Math.round(i.me))}</span>
             <span className="hbar-track" title={`${c.median(chart.age_group)}: ${formatMoney(i.peer_median)}`}>
               <span className="hbar-fill hbar-fill--peer" style={{ inlineSize: pct(i.peer_median, max) }} />
+              {i.finland !== null && (
+                <span className="mark-finland" style={{ insetInlineStart: pct(i.finland, max) }}
+                      title={`${c.finlandMark}: ${formatMoney(i.finland)}`} />
+              )}
             </span>
             <span className="hbar-value hbar-value--peer money">{formatMoney(Math.round(i.peer_median))}</span>
           </div>

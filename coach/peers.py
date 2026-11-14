@@ -11,13 +11,17 @@ seasonal spending (holidays, Christmas) is counted the same for everyone.
 Bills (Housing, Utilities) reflect living situation more than habits, so they
 stay in the comparison and the total but are kept out of the profile.
 
+Where a category maps onto Statistics Finland's household budget survey, the
+result also carries the Finnish average for people the same age (coach/statfin.py):
+an open, outside benchmark next to the bank's own customers.
+
 The same comparison is made for S-Bank's three baskets, placed by the same
 rules as the basket summary (coach/spending_baskets.py).
 """
 
 from datetime import date, timedelta
 
-from coach import calculations
+from coach import calculations, statfin
 from coach.database import queries
 from coach.spending_baskets import BASKET_LABELS, BASKET_LABELS_FI, CATEGORY_BASKETS
 
@@ -69,4 +73,16 @@ def compare(customer_id: str, today: date) -> dict:
     result["period"] = {"start_date": start.isoformat(), "end_date": end.isoformat()}
     result["customer_age"] = me["age"]
     result["not_in_profile"] = list(BILL_CATEGORIES)
+
+    # The open benchmark: Statistics Finland's average for Finnish households of the
+    # same age, where the category maps cleanly onto theirs.
+    for category, row in result["by_category"].items():
+        finland_age = statfin.monthly(category, result["age_group"])
+        if finland_age is not None:
+            row["finland"] = {
+                "age_group_monthly": finland_age,
+                "all_ages_monthly": statfin.monthly(category, "all"),
+                "difference_from_age_group_pct": calculations.difference_pct(row["my_monthly"], finland_age),
+            }
+    result["finland_source"] = statfin.source()
     return result
