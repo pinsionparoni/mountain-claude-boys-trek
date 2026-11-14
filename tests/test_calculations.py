@@ -20,6 +20,7 @@ import pytest
 from coach import calculations
 from coach.calculations import (
     average_monthly,
+    monthly_equivalent,
     prorate_monthly,
     safe_to_save,
     safe_to_spend,
@@ -367,3 +368,28 @@ def test_what_if_reduce_many_rejects_bad_percent():
             monthly_by_category={"Restaurants": 235},
             reductions_pct={"Restaurants": 150},
         )
+
+
+# --------------------------------------------------------------------------
+# monthly_equivalent
+# --------------------------------------------------------------------------
+
+@pytest.mark.parametrize(
+    "total, days, expected",
+    [
+        (900, 90, 304.38),  # 27393.75 / 90 = 304.375, rounded half up
+        (100, 30, 101.46),  # 3043.75 / 30 = 101.4583...
+        (1000, 365, 83.39),  # 30437.5 / 365 = 83.3904...
+        (-100, 30, -101.46),  # money out keeps its sign
+        (0, 30, 0.0),
+        (Decimal("900.00"), 90, 304.38),
+    ],
+)
+def test_monthly_equivalent(total, days, expected):
+    assert monthly_equivalent(total, days) == expected
+
+
+@pytest.mark.parametrize("days", [0, -5, 1.5, True])
+def test_monthly_equivalent_rejects_bad_days(days):
+    with pytest.raises(ValueError):
+        monthly_equivalent(100, days)

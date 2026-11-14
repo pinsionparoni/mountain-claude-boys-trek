@@ -6,6 +6,7 @@ from coach.spending_baskets import (
     CONSUMPTION_TRANSACTION_TYPES,
     EXCLUDED_FROM_CONSUMPTION,
     UNCLASSIFIED_FINANCIAL_FLOW_NOTES,
+    salary_sweep_info,
     summarize_baskets,
 )
 
@@ -120,7 +121,9 @@ def basket_summary(
     The result has ``baskets`` (with totals, shares and per-category
     breakdown), ``total_spending_eur``, and ``financial_flows``: income,
     salary sweeps and investment movements, reported separately so they are
-    visible but never counted as spending.
+    visible but never counted as spending. ``has_salary_sweep``,
+    ``swept_share_of_salary_pct`` and ``salary_sweep_note`` warn when salary
+    leaves the account, which can hide mandatory costs.
     """
     category_rows = spending_by_category(customer_id, start_date, end_date)
     flow_rows = financial_flows(customer_id, start_date, end_date)
@@ -137,6 +140,7 @@ def basket_summary(
         }
         for row in flow_rows
     ]
+    summary.update(salary_sweep_info(flow_rows))
     summary["period"] = {
         "start_date": start_date.isoformat(),
         "end_date": end_date.isoformat(),

@@ -6,6 +6,7 @@ import anthropic
 from dotenv import load_dotenv
 
 from coach import web_search
+from coach.tools import spending
 
 load_dotenv()
 
@@ -25,8 +26,7 @@ Teach with three spending baskets:
 Keep answers short and mobile-friendly. Answer in the language the user writes in."""
 
 client = anthropic.Anthropic()
-TOOLS = web_search.load_tools()
-TOOLS_BY_NAME = {tool.name: tool for tool in TOOLS}
+TOOLS = web_search.load_tools()  # optional web tools, the same for every customer
 
 
 def _echoable(content):
@@ -35,8 +35,8 @@ def _echoable(content):
     return [b for i, b in enumerate(content) if i > boundary or b.type == "text"]
 
 
-def _run_tool(block):
-    tool = TOOLS_BY_NAME.get(block.name)
+def _run_tool(block, tools_by_name):
+    tool = tools_by_name.get(block.name)
     if tool is None:
         return {"type": "tool_result", "tool_use_id": block.id,
                 "content": f'Error: unknown tool "{block.name}"', "is_error": True}
@@ -48,12 +48,20 @@ def _run_tool(block):
     return {"type": "tool_result", "tool_use_id": block.id, "content": content}
 
 
-def chat(messages):
+def chat(messages, customer_id=None):
     """Run one user turn. `messages` is the conversation so far, ending with a user message.
 
     Appends the assistant's turn(s) to `messages` in place and returns the final reply text.
+
+    With a `customer_id` the coach can read that one customer's transactions through the
+    spending tools. Without one it has no access to any customer data.
     """
     system = SYSTEM_PROMPT.format(today=date.today().isoformat())
+    tools = list(TOOLS)
+    if customer_id:
+        tools += spending.load_tools(customer_id)
+        system += spending.PROMPT
+    tools_by_name = {tool.name: tool for tool in tools}
     if web_search.enabled():
         system += web_search.PROMPT
     for _ in range(MAX_TURNS):
@@ -61,7 +69,7 @@ def chat(messages):
             model=MODEL,
             max_tokens=16000,
             system=system,
-            tools=TOOLS,
+            tools=tools,
             messages=messages,
             output_config={"effort": "medium"},
             betas=["server-side-fallback-2026-07-01"],
@@ -80,7 +88,7 @@ def chat(messages):
                 text += "\n\n(Answer was cut off.)"
             return text
 
-        tool_results = [_run_tool(b) for b in content if b.type == "tool_use"]
+        tool_results = [_run_tool(b, tools_by_name) for b in content if b.type == "tool_use"]
         messages.append({"role": "user", "content": tool_results})
 
     return "Sorry, that took too many steps. Could you narrow the question down?"

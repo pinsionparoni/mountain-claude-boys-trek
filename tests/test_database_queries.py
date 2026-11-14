@@ -9,34 +9,14 @@ tests/test_queries.py.
     python -m pytest tests/test_database_queries.py
 """
 
-import importlib.util
-import sys
 import types
 from datetime import date
 
 import pytest
 
-
-def _stub_missing_driver_modules():
-    """Let the queries module import on machines without psycopg/dotenv."""
-    if importlib.util.find_spec("psycopg") is None:
-        psycopg = types.ModuleType("psycopg")
-        psycopg.connect = lambda *args, **kwargs: None
-        rows = types.ModuleType("psycopg.rows")
-        rows.dict_row = object()
-        psycopg.rows = rows
-        sys.modules["psycopg"] = psycopg
-        sys.modules["psycopg.rows"] = rows
-    if importlib.util.find_spec("dotenv") is None:
-        dotenv = types.ModuleType("dotenv")
-        dotenv.load_dotenv = lambda *args, **kwargs: None
-        sys.modules["dotenv"] = dotenv
-
-
-_stub_missing_driver_modules()
-
-from coach.database import queries  # noqa: E402
-from coach.spending_baskets import (  # noqa: E402
+# tests/conftest.py stubs psycopg and dotenv if they are not installed.
+from coach.database import queries
+from coach.spending_baskets import (
     CONSUMPTION_TRANSACTION_TYPES,
     EXCLUDED_FROM_CONSUMPTION,
 )
@@ -177,6 +157,11 @@ def test_basket_summary_separates_spending_from_flows(fake_db):
     assert flows["salary_sweep"]["net_amount_eur"] == -250.46
     assert "purpose unknown" in flows["salary_sweep"]["note"]
 
+    # 250.456 swept out of 3000 salary = 8.3%.
+    assert result["has_salary_sweep"] is True
+    assert result["swept_share_of_salary_pct"] == 8.3
+    assert "8.3% of salary" in result["salary_sweep_note"]
+
     assert result["period"] == {"start_date": "2026-01-01", "end_date": "2026-03-31"}
 
 
@@ -190,6 +175,8 @@ def test_basket_summary_passes_customer_confirmation_through(fake_db):
     )
     assert result["baskets"]["mandatory_irregular"]["total_eur"] == 300.0
     assert result["financial_flows"] == []
+    assert result["has_salary_sweep"] is False
+    assert result["salary_sweep_note"] is None
 
 
 # --------------------------------------------------------------------------

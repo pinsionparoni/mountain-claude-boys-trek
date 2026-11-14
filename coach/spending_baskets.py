@@ -220,3 +220,52 @@ def summarize_baskets(category_rows, essentiality_by_category=None):
         }
 
     return {"baskets": baskets, "total_spending_eur": _eur(grand_total)}
+
+
+def salary_sweep_info(flow_rows):
+    """
+    Describe a customer's salary sweeps from ``financial_flows`` rows.
+
+    A salary sweep moves money out of the account to a destination we do not
+    know. If it pays rent or bills, those costs never appear in this account's
+    baskets, so the mandatory totals can be incomplete. Returns:
+
+    - ``has_salary_sweep``: True when the period contains any sweep.
+    - ``swept_share_of_salary_pct``: swept amount as a percentage of salary
+      received in the period, or None when there is no salary to compare to.
+    - ``salary_sweep_note``: a plain-language caveat, or None without sweeps.
+    """
+    by_type = {row["transaction_type"]: row for row in flow_rows}
+    sweep = by_type.get("salary_sweep")
+
+    if not sweep or not sweep["transaction_count"]:
+        return {
+            "has_salary_sweep": False,
+            "swept_share_of_salary_pct": None,
+            "salary_sweep_note": None,
+        }
+
+    swept = abs(Decimal(str(sweep["net_amount_eur"])))
+    salary = Decimal(0)
+    if "salary" in by_type:
+        salary = Decimal(str(by_type["salary"]["net_amount_eur"]))
+
+    share = None
+    if salary > 0:
+        share = (swept / salary * 100).quantize(
+            Decimal("0.1"), rounding=ROUND_HALF_UP
+        )
+
+    share_text = f" ({share}% of salary in this period)" if share is not None else ""
+    note = (
+        f"Salary sweeps{share_text} leave this account for a destination we "
+        "do not know. If that money pays rent, bills or other regular costs, "
+        "those costs are missing here, so treat the mandatory totals as a "
+        "minimum."
+    )
+
+    return {
+        "has_salary_sweep": True,
+        "swept_share_of_salary_pct": float(share) if share is not None else None,
+        "salary_sweep_note": note,
+    }

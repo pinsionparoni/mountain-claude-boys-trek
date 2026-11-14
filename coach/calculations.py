@@ -28,6 +28,7 @@ Number = int | float | Decimal
 _CENT = Decimal("0.01")
 _DAYS_PER_WEEK = 7
 _MONTHS_PER_YEAR = 12
+_DAYS_PER_AVERAGE_MONTH = Decimal("30.4375")  # 365.25 / 12
 
 
 # --------------------------------------------------------------------------
@@ -99,6 +100,19 @@ def prorate_monthly(
     if not isinstance(days_in_month, int) or days_in_month < 1:
         raise ValueError("days_in_month must be a positive whole number")
     return _money(amount * days / days_in_month)
+
+
+def monthly_equivalent(total: Number, days: int) -> float:
+    """
+    Convert a total over ``days`` days into an average monthly amount.
+
+    Uses an average month of 30.4375 days (365.25 / 12), so a 90-day total of
+    900 EUR is 304.38 EUR per month. ``total`` may be negative (money out).
+    """
+    amount = _d("total", total)
+    if not isinstance(days, int) or isinstance(days, bool) or days < 1:
+        raise ValueError("days must be a positive whole number")
+    return _money(amount * _DAYS_PER_AVERAGE_MONTH / days)
 
 
 # --------------------------------------------------------------------------

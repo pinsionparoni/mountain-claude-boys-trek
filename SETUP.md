@@ -98,10 +98,12 @@ Negative `tx_amount_eur` is money out. "Salary Sweep" and "Invest Withdraw" look
 ## 5. Run the coach
 
 ```bash
-.venv/bin/python -m coach
+.venv/bin/python -m coach --customer CUST00001
 ```
 
-A terminal chat for testing. Ctrl+D quits.
+A terminal chat for testing. `--customer` sets which customer's transactions the coach may read (or set `COACH_CUSTOMER_ID` in `.env`). Without it the coach has no access to any customer data. Ctrl+D quits.
+
+Run the tests that need no database with `.venv/bin/python -m pytest tests/test_calculations.py tests/test_spending_baskets.py tests/test_database_queries.py tests/test_spending_tools.py`. Name the files: the other files in `tests/` are audit scripts that query the live database when imported.
 
 ## Project layout
 
@@ -109,6 +111,10 @@ A terminal chat for testing. Ctrl+D quits.
 |---|---|
 | `coach/agent.py` | The coach: system prompt (three spending baskets) and the chat loop with tool calls |
 | `coach/web_search.py` | Optional Exa tools, only loaded when `COACH_WEB_SEARCH=1` |
+| `coach/spending_baskets.py` | What counts as spending, and which basket each category belongs to |
+| `coach/calculations.py` | Safe-to-spend, safe-to-save and what-if maths: plain Python, no database or model |
+| `coach/database/` | PostgreSQL connection and the SQL queries |
+| `coach/tools/spending.py` | The customer-scoped tools the model calls (data tools plus the calculations) |
 | `coach/__main__.py` | Terminal chat: `python -m coach` |
 | `scripts/load_data.py` | Loads `data/*.csv` into PostgreSQL (`DATABASE_URL`) |
 | `requirements.txt` | Python dependencies |
@@ -116,7 +122,7 @@ A terminal chat for testing. Ctrl+D quits.
 
 ### How a chat turn works
 
-`chat(messages)` sends the conversation to the model. If the model asks for a tool, the loop runs it, sends the result back, and repeats until there's a final answer (at most 10 rounds). Today the model is Claude and the only tools are the optional Exa ones; database tools and Gemma on Verda are next (see the build order in [TECH_STACK.md](TECH_STACK.md)).
+`chat(messages)` sends the conversation to the model. If the model asks for a tool, the loop runs it, sends the result back, and repeats until there's a final answer (at most 10 rounds). Today the model is Claude. When a customer is set, it also gets seven spending tools scoped to that customer (three data tools and four calculations, see `coach/tools/spending.py`) next to the optional Exa ones. Gemma on Verda is next (see the build order in [TECH_STACK.md](TECH_STACK.md)).
 
 ```mermaid
 flowchart TD
@@ -127,6 +133,5 @@ flowchart TD
 
 ## Next steps
 
-- Database tools for the coach (spending by category and period, basket summary, balance trend), scoped to one customer.
 - Make the model a setting so we can compare Claude and Gemma 4.
 - FastAPI web API for the mobile front end.

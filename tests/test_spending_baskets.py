@@ -15,6 +15,7 @@ from coach.spending_baskets import (
     classify_category,
     classify_transaction,
     is_consumption_transaction,
+    salary_sweep_info,
     summarize_baskets,
 )
 
@@ -202,3 +203,57 @@ def test_summarize_baskets_accepts_plain_floats():
     result = summarize_baskets(rows)
     assert result["total_spending_eur"] == 19.99
     assert result["baskets"]["everyday_flexible"]["share_pct"] == 100.0
+
+
+# --------------------------------------------------------------------------
+# salary_sweep_info
+# --------------------------------------------------------------------------
+
+def _flow(transaction_type, net, count):
+    return {
+        "transaction_type": transaction_type,
+        "net_amount_eur": net,
+        "transaction_count": count,
+    }
+
+
+def test_salary_sweep_info_without_sweeps():
+    for rows in ([], [_flow("salary", Decimal("3000"), 3)]):
+        info = salary_sweep_info(rows)
+        assert info == {
+            "has_salary_sweep": False,
+            "swept_share_of_salary_pct": None,
+            "salary_sweep_note": None,
+        }
+
+
+def test_salary_sweep_info_ignores_a_zero_count_sweep_row():
+    assert salary_sweep_info([_flow("salary_sweep", 0, 0)])["has_salary_sweep"] is False
+
+
+def test_salary_sweep_info_matches_the_real_customer_cust00080():
+    # Real audit figures: 76,885.91 swept out of 81,268.98 salary = 94.6%.
+    info = salary_sweep_info(
+        [
+            _flow("salary", Decimal("81268.98"), 24),
+            _flow("salary_sweep", Decimal("-76885.91"), 24),
+        ]
+    )
+    assert info["has_salary_sweep"] is True
+    assert info["swept_share_of_salary_pct"] == 94.6
+    assert "94.6% of salary" in info["salary_sweep_note"]
+    assert "minimum" in info["salary_sweep_note"]
+
+
+def test_salary_sweep_info_without_salary_has_no_percentage():
+    info = salary_sweep_info([_flow("salary_sweep", Decimal("-500"), 2)])
+    assert info["has_salary_sweep"] is True
+    assert info["swept_share_of_salary_pct"] is None
+    assert "%" not in info["salary_sweep_note"]
+
+
+def test_salary_sweep_note_does_not_claim_to_know_the_destination():
+    note = salary_sweep_info(
+        [_flow("salary", 1000, 1), _flow("salary_sweep", -900, 1)]
+    )["salary_sweep_note"]
+    assert "do not know" in note
