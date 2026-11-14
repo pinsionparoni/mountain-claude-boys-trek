@@ -4,6 +4,8 @@
 
 > **Status:** working demo, hosted and usable on phones. This README describes the product for the judges; the pitch materials are still in progress.
 
+**▶ Try it:** https://arvon-johannes--financial-coach.modal.run · passcode, demo customers and questions to ask: [JUDGES.md](JUDGES.md)
+
 ## The problem
 
 Banking apps stop at statements and transaction lists. S-Bank asked for an AI experience where people can **talk with their own money**: from simple questions like *"How much did I spend on taxis last month?"* to deeper ones like *"What kind of spender am I?"*, *"What is safe for me to spend this week?"* or *"How much could I save if I reduced dining out by 20%?"*
@@ -67,7 +69,7 @@ sequenceDiagram
 
 ## Where the data goes
 
-We want to be exact about this, because keeping customer data in Europe is part of our pitch. Try the demo at **https://arvon-johannes--financial-coach.modal.run** (ask us for the passcode).
+We want to be exact about this, because keeping customer data in Europe is part of our pitch. Try the demo at **https://arvon-johannes--financial-coach.modal.run**: passcode and a guide in [JUDGES.md](JUDGES.md).
 
 | Step | Where | What passes through or is kept there |
 |---|---|---|
