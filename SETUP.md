@@ -32,6 +32,7 @@ Fill in `.env`:
 | `ANTHROPIC_API_KEY` | With `claude` | [console.anthropic.com](https://console.anthropic.com) (Junction gives $20 of credits per person) |
 | `DATABASE_URL` | Yes | Service URI of the shared Aiven database from the Aiven console, or a local PostgreSQL (see step 4) |
 | `COACH_WEB_SEARCH` | No | `1` turns on optional Exa web search; default `0` |
+| `COACH_SANDBOX` | No | `0` turns off "explore my data" (Modal Sandboxes); default on. Needs `modal setup` locally, automatic on Modal |
 | `EXA_API_KEY` | Only with web search | [dashboard.exa.ai](https://dashboard.exa.ai) |
 
 > **Never commit `.env` or paste keys or the Aiven URI in chat.** `.env`, `.venv/` and `data/` are in `.gitignore`. If a key leaks, revoke it in that service's console.
@@ -327,6 +328,7 @@ flowchart LR
 | `coach/charts.py` | The charts the coach can show (`show_chart`): builds each chart's data from the query layer, no numbers from the model |
 | `coach/calculations.py` | Budget, safe-to-spend, safe-to-save, what-if and peer-comparison maths: plain Python, no database or model |
 | `coach/web_search.py` | Optional Exa tools, only loaded when `COACH_WEB_SEARCH=1` |
+| `coach/explore.py` | "Explore my data": the model's pandas over one customer's transactions, run in a Modal Sandbox (EU, no network) |
 | `coach/__main__.py` | Terminal chat: `python -m coach --customer CUST00001` |
 | `frontend/` | React + Vite mobile web app (see step 10) |
 | `frontend/src/components/` | Screens and parts: `LoginScreen`, `SmobiiliHome`, `ReceiptsPage` (real receipts), `CardCarousel` + `BasketCard` (swipeable cards above the chat), `Chat` + `ChatChart` (the coach and its charts) |
@@ -353,6 +355,7 @@ Each tool is bound to the customer the app chose when the tools were created; no
 | `get_safe_to_spend` | "What can I safely spend this week?" The monthly budget (income − 🏠 essentials − 🔧 reserve − savings = ☕ everyday budget), how much is left this month, and a cash check until the next payday. Computed in `coach/budget.py`. |
 | `calculate_safe_to_save` | "How much could I save each month?" |
 | `calculate_what_if` | "How much would I save if I cut dining out by 20%?" |
+| `explore_my_data` | Open questions no other tool answers: "Do I spend more at weekends?", "What time of day do I shop the most?". Runs the model's pandas in a Modal Sandbox; the answer says in one sentence what was counted and over which period, never anything about code |
 | `compare_with_peers` | "What kind of spender am I?" The customer against people their age and against all 5,100 customers, over the last 12 complete months: per category and per basket, the monthly amount, the peer median and typical range, and the share of peers who spend less or more. A profile lists the habits that stand out (rent and utilities left out). Where a category maps, also Statistics Finland's average for Finnish households of the same age (open data, `coach/statfin.py`). Only medians and ranks reach the model, never another customer's data. Computed in `coach/peers.py`. |
 | `show_chart` | Not a question but a picture: the coach calls it when its answer compares numbers, and the app offers the chart behind a "Näytä kaaviona" button (opened straight away if the customer asked for a chart). If the coach picks none, the agent offers one matching its lookups (`charts.offer_args`). The model picks `kind` (`categories`, `trend`, `balance`, `budget`, `peers`, the last with an optional category for one category in detail) and the period, category or basket; every number is computed in `coach/charts.py`. At most one chart per answer. |
 

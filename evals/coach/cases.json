@@ -89,5 +89,15 @@
   {"id": "hello-fi-1", "group": "chat", "lang": "fi", "customer_id": "CUST00127",
    "question": "Moi! Mitä kaikkea voit auttaa minua tekemään?", "must": {"not_refused": true}},
   {"id": "thanks-en-1", "group": "chat", "lang": "en", "customer_id": "CUST00050",
-   "question": "Thanks, that was helpful!", "must": {"not_refused": true}}
+   "question": "Thanks, that was helpful!", "must": {"not_refused": true}},
+
+  {"id": "explore-weekend-fi-1", "group": "correct", "lang": "fi", "customer_id": "CUST00001",
+   "question": "Kulutanko enemmän viikonloppuisin vai arkisin?",
+   "must": {"tools_any": ["explore_my_data"], "numbers": ["68,33", "65,94"]}},
+  {"id": "explore-weekend-en-1", "group": "correct", "lang": "en", "customer_id": "CUST00001",
+   "question": "How much do I spend per weekend day compared with weekdays?",
+   "must": {"tools_any": ["explore_my_data"], "numbers": ["68.33", "65.94"]}},
+  {"id": "explore-friday-fi-1", "group": "correct", "lang": "fi", "customer_id": "CUST00001",
+   "question": "Paljonko säästäisin vuodessa, jos jättäisin perjantain ravintolakäynnit pois?",
+   "must": {"tools_any": ["explore_my_data"], "numbers": ["57,93"]}}
 ]

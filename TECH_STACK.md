@@ -17,7 +17,7 @@ An AI money coach that keeps customer data in Europe on open models, and **compu
 | Core | **Verda** | Hosts our open models (Gemma, possibly Nemotron) in EU data centres, so customer data never goes to an outside AI API | $10k / $2.5k / $2.5k credits |
 | Core | **Gemma** | Gemma 4 is the coach's brain: chat, tool calls, explanations | €1,000 × 3 teams |
 | Core | **Aiven** | PostgreSQL holds the transaction dataset; the coach queries it with tools | €1,000 / €750 / €500 |
-| Core | **Modal** | Hosts the demo app and coach API in its EU region. (Sandboxes for calculations were the first idea; not built, see Calculations below) | $2,000 + $3,000 credits |
+| Core | **Modal** | Hosts the demo app and coach API in its EU region; Sandboxes run the coach's own code for open "explore my data" questions | $2,000 + $3,000 credits |
 | Add-on | **Nemotron** | Reads receipt and bill photos and files them into the right basket | 2 × RTX 5080 |
 | Add-on | **CRACI** | Our GitHub Actions CI runs on `runs-on: craci` | LEGO sets |
 | Add-on | **Codex** | Only if a teammate builds part of the project with Codex | $10k / $5k / $2.5k API credits |
@@ -40,6 +40,7 @@ flowchart LR
     API -.->|"receipt photo"| N
     API <-->|"SQL tools"| DB[("Aiven PostgreSQL<br/>transactions")]
     API --- CALC["coach/calculations.py<br/>budget.py, peers.py"]
+    API <-->|"explore_my_data:<br/>model-written pandas"| SB["Modal Sandbox (EU)<br/>no network"]
     API -.->|"optional"| EXA["Exa web search"]
     API -.->|"dev / comparison"| C["Claude API"]
 ```
@@ -111,7 +112,14 @@ Source: [hackjunction/Junction-2026-S-pankki](https://github.com/hackjunction/Ju
 ### Calculations: in code, never the AI
 
 - Every number comes from plain Python: `coach/calculations.py` (what-ifs, safe to save, differences; standard library only), `coach/budget.py` (monthly budget, safe to spend this week) and `coach/peers.py` (comparisons). The tools return finished figures and the model only explains them, so it never does arithmetic.
-- The first plan was for the model to write Python that runs in a Modal Sandbox. We chose fixed, tested functions instead: same exact numbers, no model-written code to run, and every formula covered by tests. `calculations.py` has no dependencies, so it could still run in a sandbox unchanged.
+- The common questions use these fixed, tested functions. For everything else there is a sandbox (below).
+
+### Explore my data: Modal Sandboxes
+
+- **Why:** MyData means exploring your own data freely, not only the questions we anticipated. The `explore_my_data` tool (`coach/explore.py`) answers open questions: weekends vs weekdays, a time of day, Friday restaurant visits, "what does one coffee cost me".
+- **How:** the model writes a few lines of pandas. Our server loads **this customer's** last 12 months of transactions (with kind, basket, merchant type and Finnish names, plus a calendar of days and the number of months, so averages are per calendar day or month) and runs the code in a fresh **Modal Sandbox**: `region="eu"`, `block_network=True`, 1 CPU, 15 s time limit, no secrets, deleted afterwards. About 2–4 s per calculation.
+- **Trust:** the computer does the arithmetic, the model only reports the result, and the answer says in one plain sentence what was counted, over which period and what an average is per. The code stays on the server: nothing about it is sent to the app or mentioned to the customer. The fixed tools stay first for safe to spend, what-ifs, comparisons and charts; the prompt sends single-category and merchant questions to them too.
+- **Tested:** `tests/test_explore.py` (table, checks, runner) and three cases in `evals/coach/cases.json`, checked against figures computed directly. `COACH_SANDBOX=0` turns it off.
 - Modal hosts the demo backend and app (see [SETUP.md § 12](SETUP.md#12-hosted-demo-on-modal) and "Where the data goes" below), pinned to Modal's EU region.
 
 ### Receipts: Nemotron 3.5 Super VL (add-on)
@@ -150,6 +158,7 @@ The hosted demo (https://arvon-johannes--financial-coach.modal.run) stores and p
 | 2. **Coach server** (FastAPI on Modal) | **EU** (Modal `region="eu"`; 12.6 ms to the database in Frankfurt) | Runs the tools and calculations. Conversations are kept in memory only, and lost when the server sleeps or restarts. |
 | 3. **Database** (Aiven PostgreSQL) | **EU**: Frankfurt, Germany | All transactions, at rest. Read-only for the coach, one customer at a time. |
 | 4. **AI model** (Gemma 4 on Verda) | **EU**: Finland (Verda, a Finnish GPU cloud) | The conversation and the customer's figures from the tools: what the model needs to answer. |
+| 5. **Calculation sandbox** (Modal Sandbox) | **EU** (Modal `region="eu"`) | Only for open questions ("explore my data"): one customer's last 12 months of transactions and the model's few lines of code. No network, no keys; the sandbox is deleted after each calculation. Started by our server, so it never passes through the web gateway. |
 | Not used in the demo | Claude API (US; development only, `COACH_MODEL=claude`) and Exa web search (US; off, and never sent personal data) | Nothing |
 
 **What we say to judges:** the customer's data is stored in the EU (Frankfurt), processed in the EU (our server on Modal) and handled by the model in the EU (Verda, Finland). Traffic between the phone and our server passes through Modal's gateway in the US, encrypted. The data is S-Pankki's synthetic dataset, so no real customer data is involved.
@@ -164,7 +173,8 @@ The hosted demo (https://arvon-johannes--financial-coach.modal.run) stores and p
 3b. **Safety and tests:** ✅ topic policy ([POLICY.md](POLICY.md)) enforced by `coach/guardrail.py` and the prompt; coach test set (`evals/coach/`, hand-written and generated cases) and Finnish language checks (`evals/finnish/`, with a blind native-speaker review); 2,100+ unit tests.
 4. **Gemma on Verda:** ✅ done. `gemma-coach` container running Gemma 4 31B (FP8), tested in English and Finnish.
 4b. **Web API:** ✅ done. FastAPI in `coach/api.py` with a streamed chat (see [SETUP.md § 9](SETUP.md#9-web-api)).
-5. **Calculations:** ✅ done in plain Python (`coach/calculations.py`, `coach/budget.py`, `coach/peers.py`). Modal Sandboxes dropped (see Calculations).
+5. **Calculations:** ✅ done in plain Python (`coach/calculations.py`, `coach/budget.py`, `coach/peers.py`).
+5b. **Explore my data:** ✅ open questions run as model-written pandas in Modal Sandboxes (EU, no network); the answer says what was counted.
 6. **Front end:** ✅ `frontend/` (React + Vite): S-mobiili mock-up with a restyled login, real receipts, swipeable cards, charts on request in the chat, the Talousneuvoja tip on the home screen, English and Finnish; installable on phones and hosted on Modal (SETUP steps 11–12). Polish in progress.
 6b. **Open data:** ✅ Statistics Finland benchmark in the peer comparison and its charts.
 7. **Add-ons:** Nemotron receipts, CRACI CI, ElevenLabs voice if time allows.
