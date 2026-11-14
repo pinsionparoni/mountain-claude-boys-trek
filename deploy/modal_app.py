@@ -10,8 +10,9 @@ see SETUP.md "Hosted demo on Modal"):
     (cd frontend && npm run build)
     .venv/bin/modal deploy deploy/modal_app.py
 
-Settings come from the Modal secret ``coach-env`` (DATABASE_URL, VERDA_BASE_URL,
-VERDA_API_KEY, COACH_MODEL, COACH_TODAY), never from files in the image.
+Settings come from the Modal secrets ``coach-env`` (DATABASE_URL, VERDA_BASE_URL,
+VERDA_API_KEY, COACH_MODEL, COACH_TODAY) and ``coach-passcode`` (DEMO_PASSCODE),
+never from files in the image.
 """
 
 from pathlib import Path
@@ -32,7 +33,11 @@ app = modal.App("financial-coach", image=image)
 
 
 @app.function(
-    secrets=[modal.Secret.from_name("coach-env")],
+    # coach-env: database, Verda and coach settings. coach-passcode: DEMO_PASSCODE,
+    # which the app asks for on the login screen (kept apart so it can change alone).
+    secrets=[modal.Secret.from_name("coach-env"), modal.Secret.from_name("coach-passcode")],
+    # Keep customer data in Europe, next to Aiven (Frankfurt) and Verda.
+    region="eu",
     # Conversations live in the server's memory, so every request must reach
     # the same container: never more than one.
     max_containers=1,
@@ -49,10 +54,28 @@ def web():
 
     from coach import api
 
+    class Frontend(StaticFiles):
+        """The built app, with caching that lets phones pick up new deploys.
+
+        Modal's files are dated 1970 and StaticFiles sends no Cache-Control,
+        so phones kept an old index.html (and with it the old app) for weeks.
+        The page, manifest and service worker are now re-checked on every
+        visit; files under assets/ have a content hash in their name, so they
+        can be kept for good.
+        """
+
+        async def get_response(self, path, scope):
+            response = await super().get_response(path, scope)
+            if path.startswith("assets/"):
+                response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+            else:
+                response.headers["Cache-Control"] = "no-cache"
+            return response
+
     # The frontend calls /api/..., exactly as Vite forwards it in development.
     # A mounted app's own startup doesn't run, so the parent runs the coach's
     # (it preloads the peer comparison data in the background).
     site = FastAPI(title="Financial Coach demo", lifespan=api.lifespan)
     site.mount("/api", api.app)
-    site.mount("/", StaticFiles(directory="/frontend", html=True), name="frontend")
+    site.mount("/", Frontend(directory="/frontend", html=True), name="frontend")
     return site

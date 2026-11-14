@@ -3,10 +3,42 @@ import type { BasketSummary, Budget } from "./types";
 
 const BASE = "/api";
 
+// The hosted demo asks for a passcode (the backend's DEMO_PASSCODE); it is sent
+// with every request and remembered on this device. Locally there is none.
+const PASSCODE_KEY = "coach-passcode";
+let passcode: string | null = (() => {
+  try { return localStorage.getItem(PASSCODE_KEY); } catch { return null; }
+})();
+
+export const savedPasscode = () => passcode ?? "";
+
+export function rememberPasscode(code: string) {
+  passcode = code;
+  try { localStorage.setItem(PASSCODE_KEY, code); } catch { /* private mode: asked again next time */ }
+}
+
+/** The backend refused the request: the passcode is missing or wrong. */
+export class PasscodeError extends Error {}
+
+const withPasscode = (headers: Record<string, string> = {}) =>
+  passcode ? { ...headers, "X-Demo-Passcode": passcode } : headers;
+
 async function getJson<T>(path: string): Promise<T> {
-  const response = await fetch(`${BASE}${path}`);
+  const response = await fetch(`${BASE}${path}`, { headers: withPasscode() });
+  if (response.status === 401) throw new PasscodeError("Wrong or missing demo passcode");
   if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
   return response.json() as Promise<T>;
+}
+
+export const fetchHealth = () =>
+  getJson<{ ok: boolean; model: string; passcode_required: boolean }>("/health");
+
+/** True if the backend accepts this passcode. */
+export async function checkPasscode(code: string): Promise<boolean> {
+  const response = await fetch(`${BASE}/passcode`, { headers: { "X-Demo-Passcode": code } });
+  if (response.status === 401) return false;
+  if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
+  return true;
 }
 
 export const fetchSummary = (customerId: string) =>
@@ -34,9 +66,10 @@ export async function streamChat(
 ): Promise<void> {
   const response = await fetch(`${BASE}/chat`, {
     method: "POST",
-    headers: { "Content-Type": "application/json", Accept: "text/event-stream" },
+    headers: withPasscode({ "Content-Type": "application/json", Accept: "text/event-stream" }),
     body: JSON.stringify({ customer_id: customerId, message, conversation_id: conversationId }),
   });
+  if (response.status === 401) throw new PasscodeError("Wrong or missing demo passcode");
   if (!response.ok || !response.body) throw new Error(`The coach is unavailable (${response.status})`);
 
   const reader = response.body.pipeThrough(new TextDecoderStream()).getReader();

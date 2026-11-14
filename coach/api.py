@@ -22,22 +22,28 @@ Endpoints:
 - ``GET /customers/{id}/summary``: spending in the three baskets for a period
   (default: this month so far), for basket cards. No AI involved.
 - ``GET /customers/{id}/budget``: the monthly budget and safe to spend this week.
-- ``GET /health``: is the API up.
+- ``GET /health``: is the API up, and does it need a demo passcode.
+- ``GET /passcode``: 200 if the ``X-Demo-Passcode`` header is right (for the login screen).
 
 Conversations live in this process's memory, so a restart forgets them. There
-is no login: anyone who can reach the API can pick any customer. Fine for the
-demo, not for real customers.
+is no real login: anyone who can reach the API can pick any customer. Fine for
+the demo, not for real customers. A hosted demo sets ``DEMO_PASSCODE``: then
+the coach and customer endpoints answer 401 unless the request carries it in
+the ``X-Demo-Passcode`` header, so strangers can't read data or keep Gemma busy.
+Without ``DEMO_PASSCODE`` (local development) nothing is checked.
 """
 
+import hmac
 import json
 import logging
+import os
 import re
 import threading
 import uuid
 from contextlib import asynccontextmanager
 from datetime import date
 
-from fastapi import FastAPI, HTTPException
+from fastapi import Depends, FastAPI, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
@@ -93,16 +99,35 @@ def _today(customer_id):
     return budget.coach_today(date.fromisoformat(profile["data_to"]))
 
 
+def _passcode():
+    return os.getenv("DEMO_PASSCODE") or None
+
+
+def require_passcode(x_demo_passcode: str | None = Header(default=None)):
+    """401 unless the request carries the demo passcode (only when DEMO_PASSCODE is set)."""
+    expected = _passcode()
+    if expected and not hmac.compare_digest((x_demo_passcode or "").encode(), expected.encode()):
+        raise HTTPException(401, "Wrong or missing demo passcode")
+
+
+PROTECTED = [Depends(require_passcode)]
+
+
 def _event(name, data):
     return f"event: {name}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
 
 
 @app.get("/health")
 def health():
-    return {"ok": True, "model": agent.COACH_MODEL}
+    return {"ok": True, "model": agent.COACH_MODEL, "passcode_required": _passcode() is not None}
 
 
-@app.post("/chat")
+@app.get("/passcode", dependencies=PROTECTED)
+def check_passcode():
+    return {"ok": True}
+
+
+@app.post("/chat", dependencies=PROTECTED)
 def chat(request: ChatRequest):
     _today(request.customer_id)  # 404 for unknown customers before streaming starts
 
@@ -135,7 +160,7 @@ def chat(request: ChatRequest):
                              headers={"Cache-Control": "no-cache"})
 
 
-@app.get("/customers/{customer_id}/summary")
+@app.get("/customers/{customer_id}/summary", dependencies=PROTECTED)
 def summary(customer_id: str, start_date: date | None = None, end_date: date | None = None):
     today = _today(customer_id)
     end = min(end_date or today, today)
@@ -148,6 +173,6 @@ def summary(customer_id: str, start_date: date | None = None, end_date: date | N
     return result
 
 
-@app.get("/customers/{customer_id}/budget")
+@app.get("/customers/{customer_id}/budget", dependencies=PROTECTED)
 def monthly_budget(customer_id: str):
     return budget.safe_to_spend(customer_id, _today(customer_id))
