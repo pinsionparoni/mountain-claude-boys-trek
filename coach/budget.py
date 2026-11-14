@@ -206,6 +206,8 @@ def safe_to_spend(customer_id, today):
         "days_to_payday": days_to_payday,
         "rent_due_before_payday": float(round(rent_due, 2)),
         "other_essentials_before_payday": float(round(spread, 2)),
+        # The sum of the two lines above, so the coach never adds them up itself.
+        "essentials_before_payday": float(round(rent_due, 2) + round(spread, 2)),
         "left_for_everyday_until_payday": cash["safe_total"],
         "per_week": cash["per_week"],
         "shortfall": cash["shortfall"],

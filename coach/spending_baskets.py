@@ -31,6 +31,75 @@ BASKET_LABELS_FI = {
     "everyday_spending": "☕ Arjen kulutus",
 }
 
+# Finnish names for the dataset's categories, merchant types and money
+# movements, so the model never has to translate them itself. Lowercase,
+# because they are mostly used mid-sentence. Checked by a native speaker,
+# 14 Nov 2026.
+CATEGORY_LABELS_FI = {
+    "Groceries": "ruokaostokset",
+    "Restaurants": "ravintolat",
+    "Transportation": "liikkuminen",
+    "Housing": "asuminen",
+    "Utilities": "sähkö, vesi ja tietoliikenne",
+    "Health": "terveys",
+    "Home & Tech": "koti ja elektroniikka",
+    "Lifestyle": "vapaa-aika",
+    "Entertainment": "viihde",
+    "Travel": "matkailu",
+    "Salary": "palkka",
+    "Other Income": "muut tulot",
+    "Salary Sweep": "palkasta lähtevä siirto",
+    "Invest Deposit": "siirto sijoituksiin",
+    "Invest Withdraw": "nosto sijoituksista",
+}
+MERCHANT_TYPE_LABELS_FI = {
+    "supermarket": "ruokakauppa",
+    "butcher": "lihakauppa",
+    "dairy shop": "maito- ja juustokauppa",
+    "convenience / specialty food": "lähi- tai erikoisruokakauppa",
+    "fuel": "polttoaine",
+    "service station": "huoltoasema",
+    "parking": "pysäköinti",
+    "public transport": "julkinen liikenne",
+    "taxi": "taksi",
+    "car rental": "autovuokraamo",
+    "pharmacy": "apteekki",
+    "doctor": "lääkäri",
+    "dentist": "hammaslääkäri",
+    "medical services": "terveyspalvelut",
+    "hardware store": "rautakauppa",
+    "home supply store": "kodintarvikekauppa",
+    "furniture": "huonekalukauppa",
+    "electronics": "elektroniikka",
+    "software": "ohjelmistot ja sovellukset",
+    "restaurant": "ravintola",
+    "fast food / café": "pikaruokapaikka tai kahvila",
+    "bar": "baari",
+    "cinema": "elokuvateatteri",
+    "tickets / events": "liput ja tapahtumat",
+    "attractions": "nähtävyydet",
+    "amusement park": "huvipuisto",
+    "recreation": "harrastukset",
+    "hobby / toys": "harrastus- ja lelukauppa",
+    "bookstore": "kirjakauppa",
+    "clothing": "vaatekauppa",
+    "sporting goods": "urheiluvälineet",
+    "airline": "lentoyhtiö",
+    "hotel": "hotelli",
+    "travel agency": "matkatoimisto",
+    "other retail": "muu kauppa",
+    "bill": "lasku",
+    "other": "muu",
+    "unclassified": "luokittelematon",
+}
+TRANSACTION_TYPE_LABELS_FI = {
+    "salary": "palkka",
+    "other_income": "muut tulot",
+    "investment_deposit": "siirto sijoituksiin",
+    "investment_withdrawal": "nosto sijoituksista",
+    "salary_sweep": "palkasta lähtevä siirto",
+}
+
 # Spending we cannot place (a category the rules don't know). Shown only when
 # non-empty, never silently put into a basket.
 UNCLASSIFIED = "unclassified"
@@ -73,6 +142,9 @@ UNCLASSIFIED_FINANCIAL_FLOW_NOTES = {
     "salary_sweep": (
         "Recurring salary-linked outgoing flow; destination and purpose unknown."
     ),
+}
+UNCLASSIFIED_FINANCIAL_FLOW_NOTES_FI = {
+    "salary_sweep": "Toistuva palkkaan liittyvä siirto pois tililtä. Kohde ja tarkoitus eivät näy.",
 }
 
 _R, _U, _E = BASKET_KEYS
@@ -343,6 +415,7 @@ def salary_sweep_info(flow_rows):
             "has_salary_sweep": False,
             "swept_share_of_salary_pct": None,
             "salary_sweep_note": None,
+            "salary_sweep_note_fi": None,
         }
 
     swept = abs(Decimal(str(sweep["net_amount_eur"])))
@@ -364,10 +437,18 @@ def salary_sweep_info(flow_rows):
         "minimum."
     )
 
+    share_text_fi = f" {str(share).replace('.', ',')} %" if share is not None else " osa"
+    note_fi = (
+        f"Palkastasi{share_text_fi} siirtyi tältä tililtä muualle, eikä siirron kohdetta näy. "
+        "Jos sillä maksetaan vuokra, laskut tai muita säännöllisiä menoja, ne puuttuvat tästä. "
+        "Pidä siksi välttämättömien menojen summaa vähimmäismääränä."
+    )
+
     return {
         "has_salary_sweep": True,
         "swept_share_of_salary_pct": float(share) if share is not None else None,
         "salary_sweep_note": note,
+        "salary_sweep_note_fi": note_fi,
     }
 
 

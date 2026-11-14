@@ -1,6 +1,6 @@
 # Coach test set
 
-Measures the whole coach, not just its Finnish: right tools and numbers, declining what [POLICY.md](../../POLICY.md) says to decline, **not** declining awkward-but-allowed questions, pointing to help, advice limits, no internal names, and Finnish quality (via `evals/finnish`). Used to compare models and to prove fine-tuning helped ([FINE_TUNING.md](../../FINE_TUNING.md)).
+Measures the whole coach, not just its Finnish: right tools and numbers, declining what [POLICY.md](../../POLICY.md) says to decline, **not** declining awkward-but-allowed questions, pointing to help, advice limits, no internal names, and Finnish quality (via `evals/finnish`). Used to compare models and to prove fine-tuning helped ([FINE_TUNING.md](../../FINE_TUNING.md)). Latest results: [RESULTS.md](../../RESULTS.md).
 
 **These are test questions: never use them, or answers to them, as training data.**
 

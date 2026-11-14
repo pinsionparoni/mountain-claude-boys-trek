@@ -10,6 +10,7 @@ from coach.spending_baskets import (
     EXCLUDED_FROM_CONSUMPTION,
     UNCLASSIFIED,
     UNCLASSIFIED_FINANCIAL_FLOW_NOTES,
+    UNCLASSIFIED_FINANCIAL_FLOW_NOTES_FI,
     basket_lookup,
     classify_purchase,
     is_large_purchase,
@@ -243,6 +244,7 @@ def basket_summary(
             "note": UNCLASSIFIED_FINANCIAL_FLOW_NOTES.get(
                 row["transaction_type"]
             ),
+            "note_fi": UNCLASSIFIED_FINANCIAL_FLOW_NOTES_FI.get(row["transaction_type"]),
         }
         for row in flow_rows
     ]

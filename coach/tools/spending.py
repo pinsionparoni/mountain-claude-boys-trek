@@ -55,7 +55,13 @@ everyday budget is left this month, and a cash check until the next salary. Lead
 explain it from the monthly budget, and if limited_by is "cash" or this_month.over_budget is above 0, say so kindly. \
 Use calculate_safe_to_save and calculate_what_if for saving and what-if questions.
 - Baskets: in English use S-Bank's names: "🏠 Regular essentials", "🔧 Unexpected necessities" and \
-"☕ Everyday spending". In Finnish use: "🏠 Välttämättömät menot", "🔧 Yllättävät menot" and "☕ Arjen kulutus". get_basket_summary places every purchase by merchant type: e.g. fuel, parking and public \
+"☕ Everyday spending". In Finnish use: "🏠 Välttämättömät menot", "🔧 Yllättävät menot" and "☕ Arjen kulutus", \
+and call them kulutuskategoriat, never kori or ostoskori: "kuuluu kategoriaan ☕ Arjen kulutus", \
+"kolme kulutuskategoriaa". \
+In Finnish answers, use the Finnish names the tools give next to each English one (category_fi, \
+merchant_type_fi, transaction_type_fi, label_fi, baskets_fi, level_fi, limited_by_fi, note_fi, \
+salary_sweep_note_fi), lowercase mid-sentence; never translate the English names yourself. \
+get_basket_summary places every purchase by merchant type: e.g. fuel, parking and public \
 transport are regular essentials, taxis are everyday spending, doctors and dentists are unexpected necessities, and \
 large one-off Health or Home & Tech purchases are unexpected necessities. Purchases without a merchant type are \
 "other". Explain the placement when it matters and that the customer can see things differently.
@@ -87,7 +93,7 @@ The chart shows the numbers, so mention only the two or three that matter most i
 If the customer asks for a different view ("show it by month", "as a chart"), call show_chart again.
 - Salary, other income, salary sweeps and investments are money movements, not spending. They are never in the baskets.
 - If get_basket_summary says has_salary_sweep is true, tell the customer that their mandatory totals may be incomplete, \
-using salary_sweep_note."""
+using salary_sweep_note (salary_sweep_note_fi in Finnish)."""
 
 
 class CoachTool(dict):
@@ -122,12 +128,59 @@ class CoachTool(dict):
         if missing:
             raise ValueError(f"missing required argument(s): {', '.join(missing)}")
 
-        return json.dumps(self._handler(tool_input))
+        return json.dumps(with_finnish_names(self._handler(tool_input)))
 
 
 # --------------------------------------------------------------------------
 # Input and output helpers
 # --------------------------------------------------------------------------
+
+LIMITED_BY_FI = {
+    "budget": "Viikon summaa rajoittaa kuukausibudjettisi, ei tilin saldo.",
+    "cash": "Viikon summaa rajoittaa tilin saldo, koska rahan on riitettävä välttämättömiin menoihin "
+            "palkkapäivään asti.",
+}
+# level is given both against people the same age (age_group) and against everyone,
+# so its Finnish name must not say which group.
+LEVEL_FI = {
+    "above_peers": "enemmän kuin useimmat vertailuryhmässä",
+    "below_peers": "vähemmän kuin useimmat vertailuryhmässä",
+    "typical": "tavallisella tasolla",
+}
+
+# Field -> Finnish names for its value; the Finnish name goes next to it as <field>_fi.
+_FINNISH_FIELDS = {
+    "category": spending_baskets.CATEGORY_LABELS_FI,
+    "merchant_type": spending_baskets.MERCHANT_TYPE_LABELS_FI,
+    "transaction_type": spending_baskets.TRANSACTION_TYPE_LABELS_FI,
+    "level": LEVEL_FI,
+    "limited_by": LIMITED_BY_FI,
+}
+
+
+def with_finnish_names(value):
+    """Add Finnish names next to the English ones in a tool result.
+
+    The English values stay (they are what the tools accept as arguments); the
+    model copies the ``_fi`` names into Finnish answers instead of translating.
+    Rows keyed by category (compare_with_peers' by_category) get ``label_fi``.
+    """
+    if isinstance(value, list):
+        return [with_finnish_names(v) for v in value]
+    if not isinstance(value, dict):
+        return value
+    result = {}
+    for key, item in value.items():
+        item = with_finnish_names(item)
+        if isinstance(item, dict) and key in spending_baskets.CATEGORY_LABELS_FI:
+            item = {"label_fi": spending_baskets.CATEGORY_LABELS_FI[key], **item}
+        result[key] = item
+        names = _FINNISH_FIELDS.get(key)
+        if names and isinstance(item, str) and item in names:
+            result[f"{key}_fi"] = names[item]
+        if key == "baskets" and isinstance(item, list):
+            result["baskets_fi"] = [spending_baskets.BASKET_LABELS_FI.get(b, b) for b in item]
+    return result
 
 def _parse_date(name, value):
     try:
@@ -282,6 +335,9 @@ def load_tools(customer_id, today=None):
     def monthly_balance_trend(args):
         months = _whole_number("months", args.get("months", 6))
         rows = queries.monthly_balance_trend(customer_id, months, as_of=today)
+        # Computed here so the coach never subtracts balances itself.
+        change = (_eur(Decimal(str(rows[-1]["balance_eur"])) - Decimal(str(rows[0]["balance_eur"])))
+                  if len(rows) >= 2 else None)
         return {
             "balances": [
                 {
@@ -290,9 +346,11 @@ def load_tools(customer_id, today=None):
                 }
                 for row in rows
             ],
+            "change_eur": change,
             "note": (
                 "balance_eur is the account balance after the customer's last "
-                "transaction in that month."
+                "transaction in that month. change_eur is the last month's balance "
+                "minus the first month's (negative: the balance went down)."
             ),
         }
 

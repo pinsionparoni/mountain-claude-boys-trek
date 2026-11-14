@@ -358,7 +358,7 @@ export const text = {
     enoughCash: (payday: string) => `Seuraava palkkapäivä ${payday} · tililläsi on siihen asti riittävästi rahaa.`,
     // Finnish dates already end with a dot ("10.9."), so no full stop after it.
     estimate: (today: string) => `Arvio omista tilitapahtumistasi ja saldostasi · tänään on ${today}`,
-    basketsTitle: "Kulutuskorisi",
+    basketsTitle: "Kulutuskategoriat",
     inTotal: (total: string) => `yhteensä ${total}`,
     purchases: (n: number) => `${n} ostoa`,
     // Kortit keskustelun yläpuolella (pyyhkäistävät)

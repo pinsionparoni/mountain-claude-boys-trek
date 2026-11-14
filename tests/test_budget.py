@@ -116,6 +116,7 @@ def test_cash_check_reserves_rent_due_before_payday(fake):
     assert cash["rent_due_before_payday"] == 900.0
     # Utilities 60 + other essentials 300 a month, spread over 28 days.
     assert cash["other_essentials_before_payday"] == 331.17
+    assert cash["essentials_before_payday"] == 1231.17  # the two above, added by the tool
     # 1500 - 900 - 331.17 = 268.83 for 28 days, 67.21 a week.
     assert cash["left_for_everyday_until_payday"] == 268.83
     assert cash["per_week"] == 67.21
