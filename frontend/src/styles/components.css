@@ -1070,3 +1070,28 @@ html, body, #root { block-size: 100%; overflow: hidden; }
 
 /* The load error offers "Try again" instead of leaving the screen empty. */
 .load-error { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--sp-space-2) var(--sp-space-4); }
+
+/* Charts on request: an answer offers its chart behind a small button; opened, the
+   chart appears where the button was (below the text it illustrates). */
+.chart-offer {
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-space-2);
+  min-block-size: 36px;
+  padding: 0 var(--sp-space-4);
+  border: 1px solid var(--sp-green-medium);
+  border-radius: var(--sp-radius-pill);
+  background: var(--sp-white);
+  color: var(--sp-green-strong);
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: var(--sp-weight-medium);
+  cursor: pointer;
+  animation: sm-fade-in var(--sp-duration-moderate) var(--sp-ease-entry);
+  transition: background-color var(--sp-duration-fast) var(--sp-ease-default);
+}
+.chart-offer:hover { background: var(--sp-green-faint); }
+.chart-offer:active { background: var(--sp-green-pale); }
+.chart-offer:focus-visible { outline: var(--sp-focus-width) solid var(--sp-focus-color); outline-offset: var(--sp-focus-offset); }
+.answer + .chat-chart { padding-block-start: var(--sp-space-3); border-block-start: 1px solid var(--sp-border-subtle); }

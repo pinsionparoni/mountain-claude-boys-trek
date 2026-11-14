@@ -21,6 +21,9 @@ interface Props {
 // input bar pinned to the bottom, like S-mobiili's tab bar. The composer, history and
 // status live outside ui.config: they are core behaviour.
 // Parent renders it with key={customerId}, so a new customer starts a new conversation.
+// The customer asked for a picture: open the chart at once instead of offering it.
+const ASKS_FOR_CHART = /kaavi|graaf|kuvaaj|piirr|visualis|havainnollist|chart|graph|plot|diagram|visuali/i;
+
 export function Chat({ customerId, t, lang, showSuggestions, pendingQuestion, onPendingSent, children }: Props) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [draft, setDraft] = useState("");
@@ -38,6 +41,8 @@ export function Chat({ customerId, t, lang, showSuggestions, pendingQuestion, on
 
   const appendToAnswer = (id: string, text: string) =>
     setMessages((all) => all.map((m) => (m.id === id ? { ...m, text: m.text + text } : m)));
+  const openChart = (id: string) =>
+    setMessages((all) => all.map((m) => (m.id === id ? { ...m, chartOpen: "below" } : m)));
   const addChart = (id: string, chart: ChartSpec) =>
     setMessages((all) => all.map((m) => (m.id === id ? { ...m, charts: [...(m.charts ?? []), chart] } : m)));
 
@@ -49,7 +54,7 @@ export function Chat({ customerId, t, lang, showSuggestions, pendingQuestion, on
     setMessages((all) => [
       ...all,
       { id: `u${n}`, author: "user", text: question },
-      { id: answerId, author: "assistant", text: "" },
+      { id: answerId, author: "assistant", text: "", streaming: true, chartOpen: ASKS_FOR_CHART.test(question) ? "above" : undefined },
     ]);
     setDraft("");
     setBusy(true);
@@ -66,6 +71,7 @@ export function Chat({ customerId, t, lang, showSuggestions, pendingQuestion, on
     } catch {
       appendToAnswer(answerId, t.unreachable);
     } finally {
+      setMessages((all) => all.map((m) => (m.id === answerId ? { ...m, streaming: false } : m)));
       setBusy(false);
       setStatus("");
     }
@@ -95,15 +101,22 @@ export function Chat({ customerId, t, lang, showSuggestions, pendingQuestion, on
         <section className="chat" aria-label={t.chatTitle}>
           <ol className="chat-log" aria-label={t.conversation}>
             {shown
-              .filter((m) => m.text || m.charts?.length)
+              .filter((m) => m.text || (m.charts?.length && (!m.streaming || m.chartOpen === "above")))
               .map((m) => (
                 <li key={m.id} className={`chat-message chat-message--${m.author}`}>
                   <span className="visually-hidden">{m.author === "user" ? t.you : t.coach}</span>
                   {m.author === "assistant"
                     ? <>
                         {/* The chart first: it gives the picture before the words explain it. */}
-                        {m.charts?.map((chart, i) => <ChatChart key={i} chart={chart} t={t} lang={lang} />)}
+                        {m.chartOpen === "above" && m.charts?.map((chart, i) => <ChatChart key={i} chart={chart} t={t} lang={lang} />)}
                         {m.text && <div className="answer">{formatAnswer(m.text)}</div>}
+                        {m.chartOpen === "below" && m.charts?.map((chart, i) => <ChatChart key={i} chart={chart} t={t} lang={lang} />)}
+                        {/* Offered only once the whole answer is in, so nothing jumps while it streams. */}
+                        {!m.chartOpen && !m.streaming && !!m.charts?.length && (
+                          <button type="button" className="chart-offer" onClick={() => openChart(m.id)}>
+                            <span aria-hidden="true">📊</span> {t.showAsChart}
+                          </button>
+                        )}
                       </>
                     : m.text}
                 </li>
