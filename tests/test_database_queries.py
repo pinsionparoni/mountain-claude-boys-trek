@@ -4,7 +4,7 @@ Tests for coach/database/queries.py that need no real database.
 A fake connection records the SQL and parameters and returns canned rows, so
 these tests check what is asked of the database (and how results are shaped),
 not what PostgreSQL returns. Confirm the SQL itself with the live check in
-tests/test_queries.py.
+scripts/audits/check_queries.py.
 
     python -m pytest tests/test_database_queries.py
 """
