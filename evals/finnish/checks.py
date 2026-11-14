@@ -54,11 +54,14 @@ def _issue(code, severity, text, start, end, hint):
 # Words allowed a capital anywhere: names and brands, matched by the start of
 # the word so inflected forms pass too (S-Pankin, Helsingissä, Suomessa).
 ALLOWED_CAPITAL_PREFIXES = (
-    "S-Pank", "S-mobiil", "S-Etukort", "Etukort", "S-Tili", "Visa", "Mastercard",
+    "S-Pank", "S-ryhm", "S-mobiil", "S-Etukort", "Etukort", "S-Tili", "S-Tuottotil",
+    "S-Määräaikaistil", "S-Lain", "ASP-", "Säästäjä", "Bonus", "Bonuks", "Bonust",
+    "Visa", "Mastercard", "Credit", "Debit", "MobilePay", "Euribor", "Aulis", "PIN-", "ETF-",
     "Helsin", "Hel", "Espoo", "Vanta", "Suom", "Euroop", "Tilastokesk", "Kela",
     "Verda", "Gemma", "Claude", "Google", "MyData", "PSD2",
-    # Help services named in POLICY.md and organisations the coach may refer to.
-    "Peluur", "Kriisipuhel", "Takuusäät", "Velkalinj", "Verohallin", "Finanssivalvon", "Vero.fi", "Alko",
+    # Help services named in POLICY.md / S_PANKKI_REFERENCE.md and organisations.
+    "Peluur", "Kriisipuhel", "Takuusäät", "Velkalinj", "Oikeuspalveluvirast",
+    "Verohallin", "Finanssivalvon", "Kuluttaja-asiamie", "Vero.fi", "Alko",
 )
 
 # The first words of S-Bank's Finnish basket names. Written exactly as the

@@ -10,6 +10,7 @@ from decimal import Decimal
 import pytest
 
 from coach.spending_baskets import (
+    CATEGORY_BASKETS,
     BASKET_KEYS,
     CATEGORY_MEDIAN_EUR,
     CONSUMPTION_TRANSACTION_TYPES,
@@ -281,6 +282,7 @@ def test_salary_sweep_info_without_sweeps():
             "has_salary_sweep": False,
             "swept_share_of_salary_pct": None,
             "salary_sweep_note": None,
+            "salary_sweep_note_fi": None,
         }
 
 
@@ -355,3 +357,21 @@ def test_lookup_agrees_with_classify_purchase(category, mcc_code, times_median):
 
 def test_large_purchase_threshold_is_ten_times_the_median():
     assert large_purchase_thresholds()["Home & Tech"] == Decimal("1110.80")
+
+
+def test_every_category_and_merchant_type_has_a_finnish_name():
+    from coach.spending_baskets import (
+        CATEGORY_LABELS_FI, INCOME_TYPES, INVESTMENT_TYPES, MERCHANT_TYPES,
+        MERCHANT_TYPE_LABELS_FI, OTHER_MERCHANT_TYPE, TRANSACTION_TYPE_LABELS_FI, UNCLASSIFIED,
+    )
+    spending_categories = {*CATEGORY_BASKETS, *OTHER_BASKETS}
+    flow_categories = {"Salary", "Other Income", "Salary Sweep", "Invest Deposit", "Invest Withdraw"}
+    assert spending_categories | flow_categories <= set(CATEGORY_LABELS_FI)
+    types = {entry[0] for entry in MERCHANT_TYPES.values()} | {OTHER_MERCHANT_TYPE, UNCLASSIFIED, "bill"}
+    assert types <= set(MERCHANT_TYPE_LABELS_FI)
+    assert {*INCOME_TYPES, *INVESTMENT_TYPES, "salary_sweep"} <= set(TRANSACTION_TYPE_LABELS_FI)
+
+
+def test_salary_sweep_note_has_a_finnish_version():
+    info = salary_sweep_info([_flow("salary", Decimal("3000"), 1), _flow("salary_sweep", Decimal("-1500"), 1)])
+    assert "50,0 %" in info["salary_sweep_note_fi"]

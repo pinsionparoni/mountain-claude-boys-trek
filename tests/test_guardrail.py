@@ -32,9 +32,12 @@ def test_parse(output, question, expected):
 
 
 def test_every_blocking_verdict_has_a_reply_in_both_languages():
+    from evals.finnish.checks import check_answer
+
     for label in ("care", "refuse"):
         for lang in ("fi", "en"):
             assert guardrail.reply(Verdict(label, lang)).strip()
+        assert check_answer(guardrail.reply(Verdict(label, "fi"))) == []
 
 
 def test_a_failing_check_lets_the_question_through():

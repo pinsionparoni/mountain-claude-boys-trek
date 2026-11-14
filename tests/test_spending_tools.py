@@ -95,6 +95,21 @@ def test_missing_required_arguments_are_reported(tools):
         tools["get_spending_by_category"].run({"start_date": "2026-01-01"})
 
 
+def test_finnish_names_are_added_next_to_english_ones():
+    result = spending.with_finnish_names({
+        "limited_by": "cash",
+        "by_category": {"Restaurants": {"age_group": {"level": "below_peers"}}},
+        "rows": [{"category": "Lifestyle", "merchant_type": "recreation", "transaction_type": "salary_sweep"}],
+    })
+    assert result["limited_by"] == "cash" and "tilin saldo" in result["limited_by_fi"]
+    assert result["by_category"]["Restaurants"]["label_fi"] == "ravintolat"
+    assert result["by_category"]["Restaurants"]["age_group"]["level_fi"] == "vähemmän kuin useimmat vertailuryhmässä"
+    assert result["rows"][0] == {"category": "Lifestyle", "category_fi": "vapaa-aika",
+                                 "merchant_type": "recreation", "merchant_type_fi": "harrastukset",
+                                 "transaction_type": "salary_sweep",
+                                 "transaction_type_fi": "palkasta lähtevä siirto"}
+
+
 def test_prompt_names_the_baskets_in_english_and_finnish():
     for name in ("Regular essentials", "Unexpected necessities", "Everyday spending",
                  "Välttämättömät menot", "Yllättävät menot", "Arjen kulutus"):
@@ -139,6 +154,7 @@ def test_spending_tool_adds_monthly_averages(tools, monkeypatch):
     assert result["period"] == {"start_date": "2026-01-01", "end_date": "2026-03-31", "days": 90}
     assert result["categories"][0] == {
         "category": "Groceries",
+        "category_fi": "ruokaostokset",
         "total_eur": 900.0,
         "monthly_average_eur": 304.38,  # 900 * 30.4375 / 90 = 304.375
         "transaction_count": 9,
@@ -179,9 +195,11 @@ def test_spending_tool_breaks_a_category_down_by_merchant_type(tools, monkeypatc
     assert result["total_eur"] == 135.0
     assert result["merchant_types"][0] == {
         "merchant_type": "taxi",
+        "merchant_type_fi": "taksi",
         "total_eur": 90.0,
         "transaction_count": 1,
         "baskets": ["everyday_spending"],
+        "baskets_fi": ["☕ Arjen kulutus"],
         "monthly_average_eur": 30.44,
     }
     assert result["merchant_types"][1]["baskets"] == ["regular_essentials"]
@@ -227,10 +245,22 @@ def test_basket_tool_adds_averages_and_sweep_warning(tools, monkeypatch):
     flows = {f["transaction_type"]: f for f in result["financial_flows"]}
     assert flows["salary"]["monthly_average_eur"] == 1014.58  # 3000 * 30.4375 / 90
     assert flows["salary_sweep"]["monthly_average_eur"] == -84.7
+    assert result["monthly_income_eur"] == 1014.58  # salary only; sweeps are not income
 
     assert result["has_salary_sweep"] is True
     assert result["swept_share_of_salary_pct"] == 8.3
     assert "minimum" in result["salary_sweep_note"]
+
+
+def test_basket_tool_adds_up_salary_and_other_income(tools, monkeypatch):
+    monkeypatch.setattr(queries, "consumption_transactions", lambda *args: [])
+    monkeypatch.setattr(queries, "financial_flows", lambda *args: [
+        {"transaction_type": "salary", "net_amount_eur": Decimal("3000.00"), "transaction_count": 3},
+        {"transaction_type": "other_income", "net_amount_eur": Decimal("300.00"), "transaction_count": 1},
+        {"transaction_type": "investment_deposit", "net_amount_eur": Decimal("-90.00"), "transaction_count": 1},
+    ])
+    result = run(tools, "get_basket_summary", Q1)
+    assert result["monthly_income_eur"] == 1014.58 + 101.46  # both incomes, not the investment
 
 
 def test_basket_tool_without_sweeps_has_no_warning(tools, monkeypatch):
@@ -267,6 +297,13 @@ def test_balance_tool_formats_months_and_defaults_to_six(tools, monkeypatch):
         {"month": "2026-08", "balance_eur": 4390.15},
         {"month": "2026-09", "balance_eur": 4723.58},
     ]
+    assert result["change_eur"] == 333.43  # 4723.58 - 4390.15, computed by the tool
+
+
+def test_balance_change_needs_two_months(tools, monkeypatch):
+    monkeypatch.setattr(queries, "monthly_balance_trend",
+                        lambda *a, **k: [{"month": date(2026, 9, 1), "balance_eur": Decimal("10.00")}])
+    assert run(tools, "get_monthly_balance_trend", {})["change_eur"] is None
 
 
 def test_balance_tool_accepts_a_float_month_count_and_rejects_fractions(tools, monkeypatch):
@@ -371,7 +408,9 @@ def test_transactions_tool_formats_rows(tools, monkeypatch):
     assert result["transactions"][0] == {
         "timestamp": "2026-03-02T18:30",
         "category": "Transportation",
+        "category_fi": "liikkuminen",
         "merchant_type": "taxi",
+        "merchant_type_fi": "taksi",
         "amount_eur": -41.27,
         "balance_after_eur": 1200.0,
     }

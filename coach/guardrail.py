@@ -48,18 +48,23 @@ REPLIES = {
         "I can't help with that. I'm happy to help with your own money, for example where it goes "
         "or what you can safely spend this week."
     ),
-    # Help services to confirm with S-Bank before the demo (POLICY.md).
+    # Verified against official service pages on 14 Nov 2026 (see S_PANKKI_REFERENCE.md);
+    # confirm S-Bank's own internal escalation wording with mentors before the demo.
     ("care", "fi"): (
-        "Kiitos, että kerroit. Et ole tilanteessasi yksin, ja apua on saatavilla maksutta ja "
-        "luottamuksellisesti: rahapelaamisen ongelmiin Peluurista, velka-asioihin Takuusäätiön "
-        "Velkalinjalta tai kunnan talous- ja velkaneuvonnasta, ja jos olo on raskas, MIELI ry:n "
-        "Kriisipuhelimesta. Kun haluat, voin katsoa kanssasi, miten rahasi riittävät palkkapäivään."
+        "Kiitos, että kerroit. Et ole tilanteessasi yksin, ja luottamuksellista tukea on saatavilla: "
+        "rahapelaamisen ongelmiin auttaa maksuton Peluuri (0800 100 101, ma–pe klo 12–18), "
+        "velka-asioihin maksuton Takuusäätiön Velkalinja (0800 9 8009, ma–to klo 10–14) tai "
+        "Oikeuspalveluviraston talous- ja velkaneuvonta, ja vaikeassa elämäntilanteessa MIELI ry:n "
+        "Kriisipuhelin (09 2525 0111, 24/7, pvm/mpm). Soita hätänumeroon 112 välittömässä vaarassa. "
+        "Kun haluat, voin myös katsoa kanssasi, miten rahasi riittävät palkkapäivään."
     ),
     ("care", "en"): (
-        "Thank you for telling me. You're not alone with this, and free, confidential help is "
-        "available: Peluuri for gambling problems, Takuusäätiö's Velkalinja or your municipality's "
-        "debt counselling for debts, and MIELI ry's crisis line if things feel heavy. Whenever you "
-        "like, I can look with you at how your money will last until payday."
+        "Thank you for telling me. You're not alone with this, and confidential help is available: "
+        "Peluuri (0800 100 101, Mon–Fri 12:00–18:00) for gambling problems, Takuusäätiö's Velkalinja "
+        "(0800 9 8009, Mon–Thu 10:00–14:00) or the Legal Services Authority's financial and debt "
+        "counselling for debts, and MIELI ry's Crisis Chat and appointments in English (mieli.fi/en) "
+        "or the 24/7 Finnish crisis line (09 2525 0111, operator call charge). In immediate danger, "
+        "call 112. Whenever you like, I can look with you at how your money will last until payday."
     ),
 }
 

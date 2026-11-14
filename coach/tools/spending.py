@@ -47,7 +47,7 @@ Customer data tools (the customer is already identified; never ask for or use an
 - For anything about the customer's own money, call the tools instead of guessing. \
 Use get_spending_by_category for category questions and get_basket_summary for "where does my money go".
 - Dates are relative to "today" (given above): "this month" is today's month, "last month" the month before it. \
-The tools never return anything after today. Always say which dates you used.
+The tools never return anything after today. Always say which dates you used: for one calendar month the month name is enough ("elokuussa", "viime vuoden elokuussa"); give a date range only for longer periods ("1.3.–31.8.2026").
 - Never do money arithmetic yourself. Use the numbers the tools return and report them as given.
 - For "what can I spend", "how much is left" or anything about a budget, call get_safe_to_spend. It returns the \
 monthly budget (income minus regular essentials, an unexpected-costs reserve and usual savings), how much of the \
@@ -55,17 +55,23 @@ everyday budget is left this month, and a cash check until the next salary. Lead
 explain it from the monthly budget, and if limited_by is "cash" or this_month.over_budget is above 0, say so kindly. \
 Use calculate_safe_to_save and calculate_what_if for saving and what-if questions.
 - Baskets: in English use S-Bank's names: "🏠 Regular essentials", "🔧 Unexpected necessities" and \
-"☕ Everyday spending". In Finnish use: "🏠 Välttämättömät menot", "🔧 Yllättävät menot" and "☕ Arjen kulutus". get_basket_summary places every purchase by merchant type: e.g. fuel, parking and public \
+"☕ Everyday spending". In Finnish use: "🏠 Välttämättömät menot", "🔧 Yllättävät menot" and "☕ Arjen kulutus", \
+and call them kulutuskategoriat, never kori or ostoskori: "kuuluu kategoriaan ☕ Arjen kulutus", \
+"kolme kulutuskategoriaa". \
+In Finnish answers, use the Finnish names the tools give next to each English one (category_fi, \
+merchant_type_fi, transaction_type_fi, label_fi, baskets_fi, level_fi, limited_by_fi, note_fi, \
+salary_sweep_note_fi), lowercase mid-sentence; never translate the English names yourself. \
+get_basket_summary places every purchase by merchant type: e.g. fuel, parking and public \
 transport are regular essentials, taxis are everyday spending, doctors and dentists are unexpected necessities, and \
 large one-off Health or Home & Tech purchases are unexpected necessities. Purchases without a merchant type are \
 "other". Explain the placement when it matters and that the customer can see things differently.
 - For questions about one kind of merchant (taxis, fuel, pharmacies, cafés), call get_spending_by_category with \
 that category to get its merchant types. Mention unusual_purchases when they explain a month.
 - For "what kind of spender am I?", "is my spending normal?" or comparisons with other people, call compare_with_peers. \
-Lead with profile.overall_level and the total against people their age, then the categories in profile.above_peers and \
-profile.below_peers. Each above_peers entry has spends_more_than_pct_of_peers ("you spend more on restaurants than 80% \
-of people aged 18–24"); each below_peers entry has spends_less_than_pct_of_peers ("you spend less on travel than 85% of \
-people your age"). Use exactly that field and its wording; never subtract or swap them. \
+The UI already shows a visual chart, so keep the text concise: lead with total.my_monthly and \
+total.age_group.difference_from_median_pct, then the standout categories from profile.above_peers and \
+profile.below_peers using each category's by_category[cat].age_group.difference_from_median_pct \
+(e.g. in Finnish: "Matkailuun käytät 50 €/kk, eli 30 % vähemmän kuin ikäisesi tyypillisesti."). \
 Name the age group and the period. Describe habits kindly and without judging; spending less is not always better. \
 Rent and utilities are left out of the profile because they reflect living situation; mention them only if asked. \
 Some by_category entries also have finland: Statistics Finland's open data on what Finnish households of the same \
@@ -88,7 +94,7 @@ for "how does my food spending compare to people my age?" call show_chart with k
 If the customer asks for a chart or a different view ("show it as a chart", "by month"), call show_chart.
 - Salary, other income, salary sweeps and investments are money movements, not spending. They are never in the baskets.
 - If get_basket_summary says has_salary_sweep is true, tell the customer that their mandatory totals may be incomplete, \
-using salary_sweep_note."""
+using salary_sweep_note (salary_sweep_note_fi in Finnish)."""
 
 
 class CoachTool(dict):
@@ -123,12 +129,59 @@ class CoachTool(dict):
         if missing:
             raise ValueError(f"missing required argument(s): {', '.join(missing)}")
 
-        return json.dumps(self._handler(tool_input))
+        return json.dumps(with_finnish_names(self._handler(tool_input)))
 
 
 # --------------------------------------------------------------------------
 # Input and output helpers
 # --------------------------------------------------------------------------
+
+LIMITED_BY_FI = {
+    "budget": "Viikon summaa rajoittaa kuukausibudjettisi, ei tilin saldo.",
+    "cash": "Viikon summaa rajoittaa tilin saldo, koska rahan on riitettävä välttämättömiin menoihin "
+            "palkkapäivään asti.",
+}
+# level is given both against people the same age (age_group) and against everyone,
+# so its Finnish name must not say which group.
+LEVEL_FI = {
+    "above_peers": "enemmän kuin useimmat vertailuryhmässä",
+    "below_peers": "vähemmän kuin useimmat vertailuryhmässä",
+    "typical": "tavallisella tasolla",
+}
+
+# Field -> Finnish names for its value; the Finnish name goes next to it as <field>_fi.
+_FINNISH_FIELDS = {
+    "category": spending_baskets.CATEGORY_LABELS_FI,
+    "merchant_type": spending_baskets.MERCHANT_TYPE_LABELS_FI,
+    "transaction_type": spending_baskets.TRANSACTION_TYPE_LABELS_FI,
+    "level": LEVEL_FI,
+    "limited_by": LIMITED_BY_FI,
+}
+
+
+def with_finnish_names(value):
+    """Add Finnish names next to the English ones in a tool result.
+
+    The English values stay (they are what the tools accept as arguments); the
+    model copies the ``_fi`` names into Finnish answers instead of translating.
+    Rows keyed by category (compare_with_peers' by_category) get ``label_fi``.
+    """
+    if isinstance(value, list):
+        return [with_finnish_names(v) for v in value]
+    if not isinstance(value, dict):
+        return value
+    result = {}
+    for key, item in value.items():
+        item = with_finnish_names(item)
+        if isinstance(item, dict) and key in spending_baskets.CATEGORY_LABELS_FI:
+            item = {"label_fi": spending_baskets.CATEGORY_LABELS_FI[key], **item}
+        result[key] = item
+        names = _FINNISH_FIELDS.get(key)
+        if names and isinstance(item, str) and item in names:
+            result[f"{key}_fi"] = names[item]
+        if key == "baskets" and isinstance(item, list):
+            result["baskets_fi"] = [spending_baskets.BASKET_LABELS_FI.get(b, b) for b in item]
+    return result
 
 def _parse_date(name, value):
     try:
@@ -278,11 +331,21 @@ def load_tools(customer_id, today=None):
             flow["monthly_average_eur"] = calculations.monthly_equivalent(
                 flow["net_amount_eur"], days
             )
+        # Salary plus other income per month, added here so the coach never adds them itself
+        # (e.g. as monthly_income for calculate_safe_to_save).
+        summary["monthly_income_eur"] = _eur(sum(
+            (Decimal(str(f["monthly_average_eur"])) for f in summary["financial_flows"]
+             if f["transaction_type"] in spending_baskets.INCOME_TYPES and f["monthly_average_eur"] > 0),
+            Decimal(0),
+        ))
         return summary
 
     def monthly_balance_trend(args):
         months = _whole_number("months", args.get("months", 6))
         rows = queries.monthly_balance_trend(customer_id, months, as_of=today)
+        # Computed here so the coach never subtracts balances itself.
+        change = (_eur(Decimal(str(rows[-1]["balance_eur"])) - Decimal(str(rows[0]["balance_eur"])))
+                  if len(rows) >= 2 else None)
         return {
             "balances": [
                 {
@@ -291,9 +354,11 @@ def load_tools(customer_id, today=None):
                 }
                 for row in rows
             ],
+            "change_eur": change,
             "note": (
                 "balance_eur is the account balance after the customer's last "
-                "transaction in that month."
+                "transaction in that month. change_eur is the last month's balance "
+                "minus the first month's (negative: the balance went down)."
             ),
         }
 
@@ -391,7 +456,8 @@ def load_tools(customer_id, today=None):
                 "unexpected_necessities, everyday_spending), each with its label, share, monthly average and "
                 "categories split by merchant type, plus unusual_purchases (large one-off purchases). "
                 "Separately the money movements (income, salary sweeps, investments) with has_salary_sweep and "
-                "a caveat when salary leaves the account."
+                "a caveat when salary leaves the account, and monthly_income_eur: salary plus other income per "
+                "month (use it as monthly_income for calculate_safe_to_save)."
             ),
             properties=dict(_DATE_PROPERTIES),
             required=["start_date", "end_date"],

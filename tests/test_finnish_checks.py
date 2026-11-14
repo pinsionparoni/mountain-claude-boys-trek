@@ -27,7 +27,7 @@ def codes(text):
     "Yhteensä kulutuksesi oli viime kuussa 1 086,14 €.",
     "Käytät viihteeseen vähemmän rahaa kuin 76,6 % ikäisistäsi.",
     "Vertasin kulutustasi muihin 18–24-vuotiaisiin ajalla 1.9.2025–31.8.2026.",
-    "*   **746,21 €** – Asuminen (lasku) 🏠",          # list item opening with a label
+    "*   **746,21 €**: asuminen (lasku) 🏠",          # list item opening with a label
     "1. Avaa S-mobiili. 2. Valitse S-Pankin tili.",    # brands, numbered list
     "Voit ohjata Bonuksen Säästäjä-palveluun tai S-Tuottotilille.",
     "Maksutonta apua saa Oikeuspalveluviraston talous- ja velkaneuvonnasta.",
@@ -60,8 +60,8 @@ def test_basket_name_capital_mid_sentence_is_its_own_warning():
 
 @pytest.mark.parametrize("text", [
     "Kulut jakautuivat kiinteisiin kuluihin (🏠 Välttämättömät menot).",
-    "Kolmas kori on **🔧 Yllättävät menot**, jonne menevät yllätykset.",
-    "Nämä kulut kuuluvat ☕ Arjen kulutus -koriin.",
+    "Kolmas kategoria on **🔧 Yllättävät menot**, jonne menevät yllätykset.",
+    "Nämä kulut kuuluvat kategoriaan ☕ Arjen kulutus.",
 ])
 def test_basket_names_written_as_names_pass(text):
     assert codes(text) == []
@@ -94,7 +94,7 @@ def test_month_names_are_lowercase_in_finnish():
     ("Erityisesti Lifestyle- ja terveysmenot ovat pieniä.", "Lifestyle"),
     ("Kategoria Home & Tech kasvoi.", "Home & Tech"),
     ("Suurin kulu oli restaurants.", "restaurants"),
-    ("Tämä on sinun everyday spending -korisi.", "everyday spending"),
+    ("Tämä kuuluu kategoriaan everyday spending.", "everyday spending"),
 ])
 def test_english_words(text, word):
     issues = check_answer(text)
@@ -203,3 +203,50 @@ def test_reviewer_corrections_are_caught(bad, code):
 ])
 def test_corrected_wording_passes(good):
     assert not [i for i in check_answer(good) if i.severity == ERROR]
+
+
+# Native reviewer's sentence-by-sentence review of the blind rating, 14 Nov 2026.
+BLIND_REVIEW = [
+    ("Tämä kulu kuuluu ☕ Arjen kulutus -koriin.",
+     "Tämä kulu kuuluu kategoriaan ☕ Arjen kulutus."),
+    ("Ajattele sitä yhtenä S-Pankin kolmesta ostoskorista.",
+     "Ajattele sitä yhtenä S-Pankin kolmesta kulutuskategoriasta."),
+    ("Katsoin kulutuksiasi viimeisen vuoden ajalta.", "Katsoin kulujasi viimeisen vuoden ajalta."),
+    ("Käytät ravintoloissa vähemmän kuin 95,7 % ikävertaisistasi.",
+     "Käytät ravintoloissa vähemmän kuin 95,7 % ikäisistäsi."),
+    ("Kokonaisuudessaan menit elokuussa 4 906,69 €.", "Kulutit elokuussa yhteensä 4 906,69 €."),
+    ("Lähimmäs pääsee nämä:", "Lähimpänä ovat nämä:"),
+    ("Hyvä tavoite on summa, joka kattaisi 1–3 kuukauden väliset välttämättömät menot.",
+     "Hyvä tavoite on summa, joka kattaa 1–3 kuukauden välttämättömät menot."),
+    ("Se on turvatyyny, joka suojaa sinua siltä, ettei arki heitä liikaa kumppanista.",
+     "Se on turvatyyny, joka suojaa sinua, kun arki yllättää."),
+    ("Käytät viihdettä vähemmän kuin suurin osa ikäisistäsi.",
+     "Käytät viihteeseen vähemmän rahaa kuin 76,6 % ikäisistäsi."),
+    ("Säästö syntyy siis helpoimmin harventamalla käyntejä kuin karsimalla isoja laskuja.",
+     "Säästät siis helpommin käymällä ravintoloissa vähemmän kuin karsimalla isoja laskuja."),
+    ("Suurin osa niistä oli kaksi lääkärikäyntiä, yhteensä 117,53 €.",
+     "Kahteen lääkärikäyntiin meni eniten rahaa, yhteensä 117,53 €."),
+    ("**Concrete suggestion:** säästä joka kuukausi.", "**Ehdotus:** säästä joka kuukausi."),
+    # Found in Gemma's answers after the change, 14 Nov 2026.
+    ("Katso, mihin arjen kulutuksen summa koostuu.", "Katso, mistä arjen kulutus koostuu."),
+    ("Lisäksi pienemmät herkk\u0e38ostokset (51,86 €).", "Lisäksi pienemmät herkkuostokset (51,86 €)."),
+    ("Rahaa meni ruokaostokksiin 390,40 €.", "Rahaa meni ruokaostoksiin 390,40 €."),
+]
+
+
+@pytest.mark.parametrize("bad, good", BLIND_REVIEW)
+def test_blind_review_corrections(bad, good):
+    assert [i for i in check_answer(bad) if i.severity == ERROR]
+    assert not [i for i in check_answer(good) if i.severity == ERROR]
+
+
+@pytest.mark.parametrize("text", [
+    "Tunnistan tunteen – joskus menoihin kuluu enemmän kuin haluaisi.",
+    'Kokeile asettaa itsellesi "baaribudjetti".',
+])
+def test_dashes_and_quote_marks_are_style_warnings(text):
+    assert any(i.code == "style" and i.severity == WARNING for i in check_answer(text))
+
+
+def test_date_and_age_ranges_are_not_dashes():
+    assert check_answer("Vertasin kulutustasi muihin 18–24-vuotiaisiin ajalla 1.9.2025–31.8.2026.") == []

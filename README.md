@@ -90,6 +90,10 @@ In short: **the data is stored, processed and handled by the AI model in the EU,
 
 More detail: [TECH_STACK.md](TECH_STACK.md)
 
+## Test results
+
+Gemma 4 and Claude Opus 5.5 on 147 test cases, plus a blind Finnish review by a native speaker: both declined every harmful question and pointed to help every time. See [RESULTS.md](RESULTS.md).
+
 ## Running it
 
 See [SETUP.md](SETUP.md).
