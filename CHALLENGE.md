@@ -63,6 +63,83 @@ A large synthetic transaction dataset modelled on the structure of S-Bank data: 
 
 **S-Pankki** – [www.s-pankki.fi](https://www.s-pankki.fi/)
 
+Booth on the **5th floor**. The challenge was posted on Discord by Mikko Leinonen (S-Pankki).
+
+## Summary brief (S-Pankki PDF)
+
+*From `s-pankki_junction_2026_brief.pdf`, shared on the Junction Discord.*
+
+**How could AI turn personal banking data into practical guidance for everyday life?**
+
+Build a **mobile-first AI financial coach** that lets people talk with their own money and turns transaction data into **personalised, actionable insights**.
+
+**Ask your money:**
+
+- *Where did my money go?*
+- *What kind of spender am I?*
+- *What can I safely spend this week?*
+- *How could I save more?*
+
+**Make spending easy to understand:**
+
+🏠 **Regular essentials** · 🔧 **Unexpected necessities** · ☕ **Everyday spending**
+
+Think your own data: let users freely explore their own finances instead of limiting them to predefined charts. Enrich insights with open data and meaningful benchmarks.
+
+### Transaction data (10 fields)
+
+| Field | Meaning |
+|---|---|
+| `customer_id` | Unique identifier for the customer |
+| `bank_account_id` | Unique identifier for the customer's bank account |
+| `tx_date` | Calendar date on which the transaction occurred |
+| `tx_timestamp` | Exact transaction date and time |
+| `category` | Business or cash-flow category assigned to the transaction |
+| `tx_amount_eur` | Signed amount in euros: negative for outflows, positive for inflows |
+| `balance_after_eur` | Account balance immediately after the transaction |
+| `transaction_type` | Economic purpose of the transaction, such as purchase or housing payment |
+| `merchant_id` | Synthetic merchant identifier for card purchases; missing for transfers |
+| `mcc_code` | Four-digit Merchant Category Code for card purchases; missing for transfers |
+
+Example: `CUST00001 • ACC000001 • 05 Oct 2024 17:51:20 • Groceries • −€32.51 • Balance €3,080.70 • purchase • MRC-GRO-0035 • MCC 5411`
+
+Negative amounts are money leaving the account; "." or blank merchant/MCC values indicate a non-card transfer.
+
+### Customer data (3 fields)
+
+| Field | Meaning |
+|---|---|
+| `customer_id` | Unique identifier for the customer |
+| `customer_postal_code` | Five-digit postal code; leading zeros are significant (store as text, e.g. 00990) |
+| `customer_age` | Customer age in completed years |
+
+Example: `CUST00001 • 00990 • 63 years`
+
+### Mortgage event data (16 fields)
+
+Event-level view of a mortgage application and negotiation process.
+
+| Field | Meaning |
+|---|---|
+| `mortgage_customer_id` | Unique identifier for the mortgage customer |
+| `timestamp` | Exact date and time of the mortgage-process event |
+| `event_type` | Process step, such as expense recording, collateral addition or valuation |
+| `property_id` | Identifier for the property linked to the application |
+| `property_type` | Property classification, for example apartment or detached house |
+| `property_price_estimate` | Current estimated property price in euros |
+| `loan_amount` | Requested mortgage amount in euros |
+| `equity_amount` | Customer-funded equity contribution in euros |
+| `collateral_type` | Type of collateral offered for the mortgage |
+| `collateral_value` | Assessed collateral value in euros |
+| `collateral_status` | Collateral assessment status, such as pending or approved |
+| `decision` | Final lending decision when available: approved or rejected |
+| `rejection_reason` | Reason for rejection when the application is declined |
+| `expense_type` | Type of mortgage-related expense, such as existing loan or transfer tax |
+| `expense_amount` | Recorded mortgage-related expense amount in euros |
+| `note` | English description of the event and its business context |
+
+Example event sequence: `expense_recorded → collateral_added → collateral_valuation`
+
 ## Judging Criteria
 
 Each criterion counts equally.
