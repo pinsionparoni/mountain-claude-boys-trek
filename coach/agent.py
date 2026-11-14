@@ -114,7 +114,8 @@ def _run_tool(tools, name, args):
         return f"Error: {e}", True
 
 
-def _chat_claude(messages, system, tools):
+def _stream_claude(messages, system, tools):
+    """Yield ("tool", name) as Claude calls tools and ("text", answer) at the end."""
     by_name = {t.name: t for t in tools}
     params = {"tools": [dict(t) for t in tools]} if tools else {}
     for _ in range(MAX_TURNS):
@@ -130,7 +131,8 @@ def _chat_claude(messages, system, tools):
         )
 
         if response.stop_reason == "refusal":
-            return "Sorry, I can't help with that one. Try asking about your spending in another way."
+            yield "text", "Sorry, I can't help with that one. Try asking about your spending in another way."
+            return
 
         # Drop declined-model blocks that precede a server-side fallback boundary.
         boundary = max((i for i, b in enumerate(response.content) if b.type == "fallback"), default=-1)
@@ -141,17 +143,19 @@ def _chat_claude(messages, system, tools):
             text = "".join(b.text for b in content if b.type == "text")
             if response.stop_reason == "max_tokens":
                 text += "\n\n(Answer was cut off.)"
-            return text
+            yield "text", text
+            return
 
         results = []
         for block in content:
             if block.type == "tool_use":
+                yield "tool", block.name
                 output, is_error = _run_tool(by_name, block.name, block.input)
                 results.append({"type": "tool_result", "tool_use_id": block.id,
                                 "content": output, "is_error": is_error})
         messages.append({"role": "user", "content": results})
 
-    return _too_many_steps(messages)
+    yield "text", _too_many_steps(messages)
 
 
 def _stream_gemma(messages, system, tools):
@@ -232,7 +236,7 @@ def chat_stream(messages, customer_id=None):
     """Run one user turn, yielding ("text", chunk) and ("tool", name) events as they happen.
 
     Same arguments as ``chat``. Gemma streams word by word; Claude yields its answer in
-    one piece. The guardrail checks the question first: for "care" and "refuse" it yields
+    one piece (after its tool calls). The guardrail checks the question first: for "care" and "refuse" it yields
     ("guardrail", label) and a fixed reply, and the coach doesn't run.
     """
     verdict = guardrail.check(messages, _ask_once)
@@ -247,7 +251,7 @@ def chat_stream(messages, customer_id=None):
     if COACH_MODEL == "gemma":
         yield from _stream_gemma(messages, system, tools)
     else:
-        yield "text", _chat_claude(messages, system, tools)
+        yield from _stream_claude(messages, system, tools)
 
 
 def chat(messages, customer_id=None):
