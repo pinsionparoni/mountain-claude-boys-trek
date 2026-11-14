@@ -25,6 +25,11 @@ BASKET_LABELS = {
     "everyday_spending": "☕ Everyday spending",
 }
 BASKET_KEYS = tuple(BASKET_LABELS)
+BASKET_LABELS_FI = {
+    "regular_essentials": "🏠 Välttämättömät menot",
+    "unexpected_necessities": "🔧 Yllättävät menot",
+    "everyday_spending": "☕ Arjen kulutus",
+}
 
 # Spending we cannot place (a category the rules don't know). Shown only when
 # non-empty, never silently put into a basket.
@@ -283,6 +288,7 @@ def summarize_baskets(transactions, basket_overrides=None):
         ]
         baskets[key] = {
             "label": BASKET_LABELS.get(key, "Unclassified"),
+            "label_fi": BASKET_LABELS_FI.get(key, "Luokittelematon"),
             "total_eur": _eur(b["total"]),
             "share_pct": float(share.quantize(Decimal("0.1"), rounding=ROUND_HALF_UP)),
             "transaction_count": b["count"],

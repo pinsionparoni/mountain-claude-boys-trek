@@ -393,3 +393,53 @@ def test_monthly_equivalent(total, days, expected):
 def test_monthly_equivalent_rejects_bad_days(days):
     with pytest.raises(ValueError):
         monthly_equivalent(100, days)
+
+
+# --------------------------------------------------------------------------
+# monthly_budget and budget_progress
+# --------------------------------------------------------------------------
+
+def test_monthly_budget_leaves_the_rest_for_everyday():
+    result = calculations.monthly_budget(
+        monthly_income=2282.17,
+        monthly_regular_essentials=1525.90,
+        monthly_unexpected_reserve=153.35,
+        monthly_savings=226.15,
+    )
+    assert result["everyday_budget"] == 376.77
+    assert result["shortfall"] == 0.0
+
+
+def test_monthly_budget_reports_a_shortfall_instead_of_a_negative_budget():
+    result = calculations.monthly_budget(
+        monthly_income=1500, monthly_regular_essentials=1400, monthly_unexpected_reserve=150,
+    )
+    assert result["everyday_budget"] == 0.0
+    assert result["shortfall"] == 50.0
+
+
+def test_budget_progress_spreads_what_is_left_over_the_rest_of_the_month():
+    # 273.82 left over 21 days: 13.04 a day, 91.27 a week.
+    result = calculations.budget_progress(everyday_budget=376.78, everyday_spent=102.96, days_left_in_month=21)
+    assert result["remaining"] == 273.82
+    assert result["per_day"] == 13.04
+    assert result["per_week"] == 91.27
+    assert result["over_budget"] == 0.0
+
+
+def test_budget_progress_with_less_than_a_week_left_gives_the_whole_remainder():
+    result = calculations.budget_progress(everyday_budget=300, everyday_spent=100, days_left_in_month=3)
+    assert result["per_week"] == 200.0
+
+
+def test_budget_progress_over_budget():
+    result = calculations.budget_progress(everyday_budget=376.78, everyday_spent=707.08, days_left_in_month=1)
+    assert result["remaining"] == 0.0
+    assert result["over_budget"] == 330.3
+    assert result["per_week"] == 0.0
+
+
+@pytest.mark.parametrize("days, error", [(0, ValueError), (2.5, TypeError), (True, TypeError)])
+def test_budget_progress_rejects_bad_days(days, error):
+    with pytest.raises(error):
+        calculations.budget_progress(everyday_budget=100, everyday_spent=0, days_left_in_month=days)

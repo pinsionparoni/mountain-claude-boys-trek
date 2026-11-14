@@ -11,10 +11,11 @@ For Gemma the definitions are converted to the OpenAI function format.
 
 import json
 import os
+from datetime import date
 
 from dotenv import load_dotenv
 
-from coach import web_search
+from coach import budget, web_search
 from coach.database import queries
 from coach.tools import spending
 
@@ -37,8 +38,8 @@ Keep answers short and mobile-friendly. Answer in the language the user writes i
 
 CUSTOMER_PROMPT = """
 
-You are talking with customer {customer_id} (age {age}). Their transaction data runs from {data_from} \
-to {data_to}; treat {data_to} as today. Their current account balance is {balance_eur} €."""
+You are talking with customer {customer_id} (age {age}). Today is {today} ({weekday}); their transaction data \
+runs from {data_from} up to today. Their account balance today is {balance_eur} €."""
 
 _clients = {}
 
@@ -161,9 +162,15 @@ def chat(messages, customer_id=None):
     system = SYSTEM_PROMPT
     tools = web_search.load_tools()
     if customer_id:
-        system += CUSTOMER_PROMPT.format(**queries.customer_profile(customer_id))
+        profile = queries.customer_profile(customer_id)
+        today = budget.coach_today(date.fromisoformat(profile["data_to"]))
+        system += CUSTOMER_PROMPT.format(
+            customer_id=customer_id, age=profile["age"], data_from=profile["data_from"],
+            today=today.isoformat(), weekday=today.strftime("%A"),
+            balance_eur=queries.balance_as_of(customer_id, today),
+        )
         system += spending.PROMPT
-        tools += spending.load_tools(customer_id)
+        tools += spending.load_tools(customer_id, today)
     if web_search.enabled():
         system += web_search.PROMPT
     if COACH_MODEL == "gemma":

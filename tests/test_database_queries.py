@@ -11,6 +11,7 @@ scripts/audits/check_queries.py.
 
 import types
 from datetime import date
+from decimal import Decimal
 
 import pytest
 
@@ -195,7 +196,15 @@ def test_balance_trend_is_anchored_to_the_customers_data_not_today(fake_db):
     sql, params = fake_db.cursors[0].calls[0]
     assert "MAX(tx_date)" in sql
     assert "CURRENT_DATE" not in sql
-    assert params == ("CUST1", "CUST1", 6)
+    assert params == ("CUST1", None, None, "CUST1", 6, None, None)
+
+
+def test_balance_trend_can_stop_at_a_demo_date(fake_db):
+    fake_db.queue([])
+    queries.monthly_balance_trend("CUST1", months=3, as_of=date(2026, 9, 18))
+    _, params = fake_db.cursors[0].calls[0]
+    assert params == ("CUST1", date(2026, 9, 18), date(2026, 9, 18), "CUST1", 3,
+                      date(2026, 9, 18), date(2026, 9, 18))
 
 
 @pytest.mark.parametrize("months", [0, 25, -1])
@@ -257,3 +266,23 @@ def test_customer_profile_unknown_customer(fake_db):
     fake_db.queue([])
     with pytest.raises(ValueError, match="Unknown customer"):
         queries.customer_profile("CUST99999")
+
+
+def test_monthly_flows_groups_by_month_and_type(fake_db):
+    fake_db.queue([])
+    queries.monthly_flows("CUST1", START, END)
+    query, params = fake_db.cursors[0].calls[0]
+    assert "DATE_TRUNC('month', tx_date)" in query
+    assert params == ("CUST1", START, END, EXCLUDED_FROM_CONSUMPTION)
+
+
+def test_salary_dates_returns_plain_dates(fake_db):
+    fake_db.queue([{"tx_date": date(2026, 1, 15)}, {"tx_date": date(2026, 2, 27)}])
+    assert queries.salary_dates("CUST1", START, END) == [date(2026, 1, 15), date(2026, 2, 27)]
+
+
+def test_balance_as_of(fake_db):
+    fake_db.queue([{"balance_after_eur": Decimal("812.349")}], [])
+    assert queries.balance_as_of("CUST1", date(2026, 9, 18)) == 812.35
+    assert fake_db.cursors[0].calls[0][1] == ("CUST1", date(2026, 9, 18))
+    assert queries.balance_as_of("CUST1", date(2020, 1, 1)) is None

@@ -13,11 +13,12 @@ Full brief: [CHALLENGE.md](CHALLENGE.md)
 ## What our coach does
 
 - **Answers questions about your own transactions** in plain language, in Finnish or English.
-- **Teaches the three spending baskets** from the brief:
-  1. mandatory and regular (rent, utilities),
-  2. mandatory and irregular (a broken washing machine),
-  3. everyday spending that slips through your fingers (coffees, takeaway).
-- **Computes, doesn't guess:** what-if and safe-to-spend numbers come from real calculations on your data. *(planned)*
+- **Teaches S-Bank's three spending baskets**, placing every purchase by merchant type:
+  1. 🏠 Regular essentials / Välttämättömät menot (rent, bills, groceries, public transport),
+  2. 🔧 Unexpected necessities / Yllättävät menot (the dentist, a broken washing machine),
+  3. ☕ Everyday spending / Arjen kulutus (coffees, takeaway, taxis).
+- **A monthly budget and safe to spend this week:** income minus essentials, a reserve for surprises and usual savings gives the everyday budget; the coach tells you what's left this week and checks your account can cover the bills before payday.
+- **Computes, doesn't guess:** every number comes from code run on your own transactions; the AI only explains it.
 - **Keeps customer data in Europe** by running Google's open Gemma 4 model on our own server at Verda, instead of sending it to an outside AI service.
 - **Optional benchmarks** from open sources such as Statistics Finland, without ever sending personal data to a search engine.
 

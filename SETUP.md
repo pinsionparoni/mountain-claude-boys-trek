@@ -25,6 +25,7 @@ Fill in `.env`:
 
 | Setting | Required | Where to get it |
 |---|---|---|
+| `COACH_TODAY` | No | Demo date, e.g. `2026-09-18`: the coach treats it as "today" and never shows data after it. Empty = the customer's last data date (30 Sep 2026) |
 | `COACH_MODEL` | No | `gemma` (default in `.env.example`, the product) or `claude` (development / comparison). Code default if unset: `claude` |
 | `VERDA_BASE_URL` | With `gemma` | `https://containers.datacrunch.io/gemma-coach/v1` (see step 5) |
 | `VERDA_API_KEY` | With `gemma` | Verda console → **Credentials** → **Inference API Keys** → **Create** (ask the teammate who owns Verda) |
@@ -183,7 +184,7 @@ A terminal chat for testing. `--customer` sets which customer's transactions the
 
 Questions to try (S-Bank's "Ask your money" plus our own): "Where did my money go last month?", "What can I safely spend this week?", "How much did I spend on taxis last month?", "Mihin rahani menevät? Jaa kulutukseni kolmeen koriin viime kuukaudelta.", "How much could I save per year if I cut restaurant spending by 20%?"
 
-The data ends on 30 September 2026, so the coach treats each customer's last transaction date as "today".
+The data ends on 30 September 2026, so by default the coach treats each customer's last transaction date as "today". That is the last day of a month, so for demos set a date mid-month, e.g. `COACH_TODAY=2026-09-10 .venv/bin/python -m coach --customer CUST00001`, to show a month in progress.
 
 ## 8. Tests
 
@@ -213,7 +214,8 @@ flowchart LR
 | `coach/database/queries.py` | The SQL queries |
 | `coach/database/connection.py` | One shared, read-only PostgreSQL connection |
 | `coach/spending_baskets.py` | What counts as spending, and which basket each transaction belongs to |
-| `coach/calculations.py` | Safe-to-spend, safe-to-save and what-if maths: plain Python, no database or model |
+| `coach/budget.py` | Monthly budget and safe to spend this week: gathers the customer's history and calls the calculations |
+| `coach/calculations.py` | Budget, safe-to-spend, safe-to-save and what-if maths: plain Python, no database or model |
 | `coach/web_search.py` | Optional Exa tools, only loaded when `COACH_WEB_SEARCH=1` |
 | `coach/__main__.py` | Terminal chat: `python -m coach --customer CUST00001` |
 | `scripts/load_data.py` | Loads `data/*.csv` into PostgreSQL (`DATABASE_URL`) |
@@ -233,8 +235,7 @@ Each tool is bound to the customer the app chose when the tools were created; no
 | `get_basket_summary` | "Where did my money go?" Spending in 🏠 🔧 ☕ with shares, categories and merchant types, large one-off purchases, and income, savings and salary sweeps shown separately. |
 | `get_monthly_balance_trend` | "How has my balance changed?" End-of-month balance for recent months. |
 | `get_transactions` | "What were my biggest purchases?" The largest or latest transactions, optionally for one category. |
-| `calculate_prorated_amount` | Part of a monthly amount that falls in a number of days. |
-| `calculate_safe_to_spend` | "What can I safely spend this week?" |
+| `get_safe_to_spend` | "What can I safely spend this week?" The monthly budget (income − 🏠 essentials − 🔧 reserve − savings = ☕ everyday budget), how much is left this month, and a cash check until the next payday. Computed in `coach/budget.py`. |
 | `calculate_safe_to_save` | "How much could I save each month?" |
 | `calculate_what_if` | "How much would I save if I cut dining out by 20%?" |
 

@@ -177,6 +177,81 @@ def safe_to_spend(
 
 
 # --------------------------------------------------------------------------
+# Monthly budget
+# --------------------------------------------------------------------------
+
+def monthly_budget(
+    *,
+    monthly_income: Number,
+    monthly_regular_essentials: Number,
+    monthly_unexpected_reserve: Number,
+    monthly_savings: Number = 0,
+) -> dict:
+    """
+    The customer's everyday-spending budget for a month.
+
+        everyday_budget = income
+                          - regular essentials   (rent, bills, groceries, transport)
+                          - unexpected reserve   (their average surprise costs)
+                          - savings              (what they usually set aside)
+
+    Inputs are typical monthly amounts. ``everyday_budget`` is floored at 0;
+    if essentials, reserve and savings exceed income the gap is ``shortfall``.
+    """
+    income = _non_negative("monthly_income", monthly_income)
+    regular = _non_negative("monthly_regular_essentials", monthly_regular_essentials)
+    reserve = _non_negative("monthly_unexpected_reserve", monthly_unexpected_reserve)
+    savings = _non_negative("monthly_savings", monthly_savings)
+
+    everyday = income - regular - reserve - savings
+
+    return {
+        "monthly_income": _money(income),
+        "regular_essentials": _money(regular),
+        "unexpected_reserve": _money(reserve),
+        "savings": _money(savings),
+        "everyday_budget": _money(max(everyday, Decimal(0))),
+        "shortfall": _money(max(-everyday, Decimal(0))),
+    }
+
+
+def budget_progress(
+    *,
+    everyday_budget: Number,
+    everyday_spent: Number,
+    days_left_in_month: int,
+) -> dict:
+    """
+    How much of this month's everyday budget is left, and what that allows per week.
+
+    ``days_left_in_month`` counts today. With a week or less left, ``per_week``
+    is the whole remainder.
+    """
+    budget = _non_negative("everyday_budget", everyday_budget)
+    spent = _non_negative("everyday_spent", everyday_spent)
+
+    if not isinstance(days_left_in_month, int) or isinstance(days_left_in_month, bool):
+        raise TypeError("days_left_in_month must be a whole number")
+    if days_left_in_month < 1:
+        raise ValueError("days_left_in_month must be at least 1")
+
+    remaining = budget - spent
+    left = max(remaining, Decimal(0))
+    per_day = left / days_left_in_month
+    per_week = per_day * min(_DAYS_PER_WEEK, days_left_in_month)
+
+    return {
+        "everyday_budget": _money(budget),
+        "everyday_spent": _money(spent),
+        "remaining": _money(left),
+        "over_budget": _money(max(-remaining, Decimal(0))),
+        "days_left_in_month": days_left_in_month,
+        "per_day": _money(per_day),
+        "per_week": _money(per_week),
+    }
+
+
+# --------------------------------------------------------------------------
 # Safe to save
 # --------------------------------------------------------------------------
 

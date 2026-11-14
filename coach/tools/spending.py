@@ -5,13 +5,17 @@ The customer is fixed when the tools are created: ``load_tools(customer_id)``.
 No tool accepts a customer ID, and unexpected arguments are rejected, so the
 model can never read another customer's data, even if it tries.
 
-Eight tools:
+Seven tools:
 
 - Data (PostgreSQL): ``get_spending_by_category``, ``get_basket_summary``,
   ``get_monthly_balance_trend``, ``get_transactions``.
+- Budget (``coach/budget.py``): ``get_safe_to_spend``: the monthly budget,
+  this month's progress and a cash check until payday, all computed in Python.
 - Calculations (plain Python, see ``coach/calculations.py``):
-  ``calculate_prorated_amount``, ``calculate_safe_to_spend``,
   ``calculate_safe_to_save``, ``calculate_what_if``.
+
+Data never goes past the coach's "today" (``load_tools(customer_id, today)``),
+so a demo date set with COACH_TODAY behaves like the real present.
 
 Data tools return monthly averages already computed, and the calculation tools
 do the maths, so the model never has to do money arithmetic itself.
@@ -26,7 +30,7 @@ import json
 from datetime import date
 from decimal import Decimal
 
-from coach import calculations, spending_baskets
+from coach import budget, calculations, spending_baskets
 from coach.database import queries
 
 # First and last day of the S-Pankki dataset, from the full-table audit.
@@ -38,13 +42,16 @@ PROMPT = f"""
 Customer data tools (the customer is already identified; never ask for or use an ID):
 - For anything about the customer's own money, call the tools instead of guessing. \
 Use get_spending_by_category for category questions and get_basket_summary for "where does my money go".
-- The customer's data runs from {DATA_START.isoformat()} to {DATA_END.isoformat()}. Treat the end of the data as "now": \
-"last month" means the last full month in the data and "recently" means the last few months before {DATA_END.isoformat()}. \
-Always say which dates you used.
-- Never do money arithmetic yourself. Use the monthly_average_eur values the tools return, and use the calculate_* tools \
-for safe-to-spend, safe-to-save and what-if questions. Report their numbers exactly as given.
-- Baskets: use S-Bank's names exactly: "🏠 Regular essentials", "🔧 Unexpected necessities" and \
-"☕ Everyday spending". get_basket_summary places every purchase by merchant type: e.g. fuel, parking and public \
+- Dates are relative to "today" (given above): "this month" is today's month, "last month" the month before it. \
+The tools never return anything after today. Always say which dates you used.
+- Never do money arithmetic yourself. Use the numbers the tools return and report them as given.
+- For "what can I spend", "how much is left" or anything about a budget, call get_safe_to_spend. It returns the \
+monthly budget (income minus regular essentials, an unexpected-costs reserve and usual savings), how much of the \
+everyday budget is left this month, and a cash check until the next salary. Lead with safe_to_spend_this_week, \
+explain it from the monthly budget, and if limited_by is "cash" or this_month.over_budget is above 0, say so kindly. \
+Use calculate_safe_to_save and calculate_what_if for saving and what-if questions.
+- Baskets: in English use S-Bank's names: "🏠 Regular essentials", "🔧 Unexpected necessities" and \
+"☕ Everyday spending". In Finnish use: "🏠 Välttämättömät menot", "🔧 Yllättävät menot" and "☕ Arjen kulutus". get_basket_summary places every purchase by merchant type: e.g. fuel, parking and public \
 transport are regular essentials, taxis are everyday spending, doctors and dentists are unexpected necessities, and \
 large one-off Health or Home & Tech purchases are unexpected necessities. Purchases without a merchant type are \
 "other". Explain the placement when it matters and that the customer can see things differently.
@@ -52,9 +59,7 @@ large one-off Health or Home & Tech purchases are unexpected necessities. Purcha
 that category to get its merchant types. Mention unusual_purchases when they explain a month.
 - Salary, other income, salary sweeps and investments are money movements, not spending. They are never in the baskets.
 - If get_basket_summary says has_salary_sweep is true, tell the customer that their mandatory totals may be incomplete, \
-using salary_sweep_note.
-- For safe-to-spend: the current balance is the latest balance from get_monthly_balance_trend with months=1. \
-Turn monthly averages into amounts for the period with calculate_prorated_amount before passing them on."""
+using salary_sweep_note."""
 
 
 class CoachTool(dict):
@@ -112,9 +117,14 @@ def _whole_number(name, value):
     raise ValueError(f"{name} must be a whole number")
 
 
-def _period(args):
+def _period(args, today=None):
+    """Parse the period; with ``today``, an end date after today is moved back to today."""
     start = _parse_date("start_date", args["start_date"])
     end = _parse_date("end_date", args["end_date"])
+    if today is not None:
+        if start > today:
+            raise ValueError(f"start_date is after today ({today.isoformat()}); there is no data yet")
+        end = min(end, today)
     if start > end:
         raise ValueError("start_date cannot be after end_date")
     return start, end, (end - start).days + 1
@@ -162,15 +172,21 @@ def _number(description):
 # Tool factory
 # --------------------------------------------------------------------------
 
-def load_tools(customer_id):
-    """Return the coach's spending tools, all scoped to ``customer_id``."""
+def load_tools(customer_id, today=None):
+    """
+    Return the coach's spending tools, all scoped to ``customer_id``.
+
+    ``today`` is the coach's "today" (see coach/budget.py): tools never return
+    data after it. None means the end of the dataset.
+    """
     if not isinstance(customer_id, str) or not customer_id.strip():
         raise ValueError("customer_id is required")
+    today = today or DATA_END
 
     # ---- data tools -------------------------------------------------------
 
     def spending_by_category(args):
-        start, end, days = _period(args)
+        start, end, days = _period(args, today)
         category = _category(args)
         if category is not None:
             transactions = queries.consumption_transactions(customer_id, start, end)
@@ -214,7 +230,7 @@ def load_tools(customer_id):
         }
 
     def basket_summary(args):
-        start, end, days = _period(args)
+        start, end, days = _period(args, today)
         summary = queries.basket_summary(customer_id, start, end)
 
         summary["period"]["days"] = days
@@ -237,7 +253,7 @@ def load_tools(customer_id):
 
     def monthly_balance_trend(args):
         months = _whole_number("months", args.get("months", 6))
-        rows = queries.monthly_balance_trend(customer_id, months)
+        rows = queries.monthly_balance_trend(customer_id, months, as_of=today)
         return {
             "balances": [
                 {
@@ -253,7 +269,7 @@ def load_tools(customer_id):
         }
 
     def transactions(args):
-        start, end, _ = _period(args)
+        start, end, _ = _period(args, today)
         limit = _whole_number("limit", args.get("limit", 20))
         rows = queries.list_transactions(
             customer_id, start, end,
@@ -277,23 +293,8 @@ def load_tools(customer_id):
 
     # ---- calculation tools ------------------------------------------------
 
-    def prorated_amount(args):
-        days_in_month = _whole_number("days_in_month", args.get("days_in_month", 30))
-        return {
-            "amount_eur": calculations.prorate_monthly(
-                args["monthly_amount"],
-                _whole_number("days", args["days"]),
-                days_in_month,
-            )
-        }
-
     def safe_to_spend(args):
-        optional = ("expected_income", "committed_expenses", "irregular_reserve", "buffer")
-        return calculations.safe_to_spend(
-            current_balance=args["current_balance"],
-            days_remaining=_whole_number("days_remaining", args["days_remaining"]),
-            **{key: args[key] for key in optional if key in args},
-        )
+        return budget.safe_to_spend(customer_id, today)
 
     def safe_to_save(args):
         optional = {"cushion_fraction": args["cushion_fraction"]} if "cushion_fraction" in args else {}
@@ -373,46 +374,17 @@ def load_tools(customer_id):
             handler=transactions,
         ),
         CoachTool(
-            name="calculate_prorated_amount",
+            name="get_safe_to_spend",
             description=(
-                "Share of a monthly amount that falls in a number of days, for example the part of a "
-                "monthly bill budget that is due in the next 10 days."
+                "What the customer can safely spend this week, from a monthly budget. Returns "
+                "monthly_budget (typical income minus regular essentials, an unexpected-costs reserve and "
+                "usual savings, leaving the everyday budget), this_month (everyday budget left, per week and "
+                "per day, over_budget), cash_check (balance, next payday, rent and essentials still due before "
+                "it) and safe_to_spend_this_week: the smaller of the budget and cash amounts, with limited_by "
+                "saying which. Everything is computed; just explain it."
             ),
-            properties={
-                "monthly_amount": _number("The monthly amount in EUR, not negative."),
-                "days": {"type": "integer", "description": "Number of days."},
-                "days_in_month": {
-                    "type": "integer",
-                    "description": "Days in the month used for the share. Default 30.",
-                },
-            },
-            required=["monthly_amount", "days"],
-            handler=prorated_amount,
-        ),
-        CoachTool(
-            name="calculate_safe_to_spend",
-            description=(
-                "How much the customer can spend on everyday things until the end of a period (for "
-                "example until the next salary). Returns safe_total, per_day, per_week and any shortfall. "
-                "All amounts are for the period, in EUR, and not negative except current_balance."
-            ),
-            properties={
-                "current_balance": _number("Current account balance in EUR. May be negative."),
-                "days_remaining": {
-                    "type": "integer",
-                    "description": "Days left in the period, at least 1.",
-                    "minimum": 1,
-                },
-                "expected_income": _number("Income arriving inside the period. Default 0."),
-                "committed_expenses": _number(
-                    "Mandatory regular bills still due inside the period. Default 0."
-                ),
-                "irregular_reserve": _number(
-                    "Amount set aside for surprise costs in the period. Default 0."
-                ),
-                "buffer": _number("Minimum balance the customer wants to keep. Default 0."),
-            },
-            required=["current_balance", "days_remaining"],
+            properties={},
+            required=[],
             handler=safe_to_spend,
         ),
         CoachTool(

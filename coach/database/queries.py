@@ -248,6 +248,7 @@ def basket_summary(
 def monthly_balance_trend(
     customer_id: str,
     months: int = 6,
+    as_of: date | None = None,
 ) -> list[dict]:
     """
     Return the latest recorded transaction balance
@@ -257,6 +258,8 @@ def monthly_balance_trend(
     today's date, so it still works when the data stops before the present
     (the dataset ends in September 2026). It covers that month and the
     ``months - 1`` months before it; months with no transactions are omitted.
+    With ``as_of``, transactions after that date are ignored (the coach's
+    "today" in a demo).
     """
     if not customer_id:
         raise ValueError("customer_id is required")
@@ -269,6 +272,7 @@ def monthly_balance_trend(
             SELECT DATE_TRUNC('month', MAX(tx_date))::date AS latest_month
             FROM transactions
             WHERE customer_id = %s
+              AND (%s::date IS NULL OR tx_date <= %s)
         )
         SELECT DISTINCT ON (
             DATE_TRUNC('month', t.tx_timestamp)
@@ -282,6 +286,7 @@ def monthly_balance_trend(
               latest.latest_month
               - (%s - 1) * INTERVAL '1 month'
           )
+          AND (%s::date IS NULL OR t.tx_date <= %s)
         ORDER BY
             DATE_TRUNC('month', t.tx_timestamp),
             t.tx_timestamp DESC,
@@ -290,7 +295,10 @@ def monthly_balance_trend(
 
     with get_connection() as conn:
         with conn.cursor() as cur:
-            cur.execute(query, (customer_id, customer_id, months))
+            cur.execute(
+                query,
+                (customer_id, as_of, as_of, customer_id, months, as_of, as_of),
+            )
             return cur.fetchall()
 
 
@@ -340,3 +348,90 @@ def customer_profile(customer_id: str) -> dict:
         "data_to": row["data_to"].isoformat(),
         "balance_eur": round(float(row["balance_eur"]), 2),
     }
+
+
+def monthly_flows(
+    customer_id: str,
+    start_date: date,
+    end_date: date,
+) -> list[dict]:
+    """
+    Return non-consumption money movements per calendar month and type.
+
+    Rows have ``month`` (first day of the month), ``transaction_type`` and
+    ``net_amount_eur`` (signed: positive is money in). Covers the same types
+    as ``financial_flows``: salary, other income, salary sweeps and
+    investments. Dates are inclusive.
+    """
+    _validate_customer_and_dates(customer_id, start_date, end_date)
+
+    query = """
+        SELECT
+            DATE_TRUNC('month', tx_date)::date AS month,
+            transaction_type,
+            SUM(tx_amount_eur) AS net_amount_eur
+        FROM transactions
+        WHERE customer_id = %s
+          AND tx_date >= %s
+          AND tx_date <= %s
+          AND transaction_type = ANY(%s)
+        GROUP BY 1, 2
+        ORDER BY 1, 2;
+    """
+
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                query,
+                (customer_id, start_date, end_date, EXCLUDED_FROM_CONSUMPTION),
+            )
+            return cur.fetchall()
+
+
+def salary_dates(
+    customer_id: str,
+    start_date: date,
+    end_date: date,
+) -> list[date]:
+    """Return the dates the customer was paid salary, oldest first. Dates are inclusive."""
+    _validate_customer_and_dates(customer_id, start_date, end_date)
+
+    query = """
+        SELECT tx_date
+        FROM transactions
+        WHERE customer_id = %s
+          AND tx_date >= %s
+          AND tx_date <= %s
+          AND transaction_type = 'salary'
+        ORDER BY tx_date;
+    """
+
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(query, (customer_id, start_date, end_date))
+            return [row["tx_date"] for row in cur.fetchall()]
+
+
+def balance_as_of(customer_id: str, day: date) -> float | None:
+    """
+    Return the account balance at the end of ``day``: the balance after the
+    customer's last transaction on or before it, or None if there is none.
+    """
+    if not customer_id:
+        raise ValueError("customer_id is required")
+
+    query = """
+        SELECT balance_after_eur
+        FROM transactions
+        WHERE customer_id = %s
+          AND tx_date <= %s
+        ORDER BY tx_timestamp DESC, id DESC
+        LIMIT 1;
+    """
+
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(query, (customer_id, day))
+            row = cur.fetchone()
+
+    return round(float(row["balance_after_eur"]), 2) if row else None

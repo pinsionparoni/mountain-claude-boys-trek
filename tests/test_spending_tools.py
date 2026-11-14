@@ -23,8 +23,7 @@ EXPECTED_TOOLS = {
     "get_basket_summary",
     "get_monthly_balance_trend",
     "get_transactions",
-    "calculate_prorated_amount",
-    "calculate_safe_to_spend",
+    "get_safe_to_spend",
     "calculate_safe_to_save",
     "calculate_what_if",
 }
@@ -94,9 +93,29 @@ def test_missing_required_arguments_are_reported(tools):
         tools["get_spending_by_category"].run({"start_date": "2026-01-01"})
 
 
-def test_prompt_states_the_end_of_the_data():
-    assert "2026-09-30" in spending.PROMPT
+def test_prompt_names_the_baskets_in_english_and_finnish():
+    for name in ("Regular essentials", "Unexpected necessities", "Everyday spending",
+                 "Välttämättömät menot", "Yllättävät menot", "Arjen kulutus"):
+        assert name in spending.PROMPT
+    assert "get_safe_to_spend" in spending.PROMPT
+
+
+def test_tools_default_to_the_end_of_the_data():
     assert spending.DATA_END == date(2026, 9, 30)
+
+
+def test_periods_stop_at_today(monkeypatch):
+    seen = []
+    monkeypatch.setattr(queries, "spending_by_category",
+                        lambda customer_id, start, end: seen.append((start, end)) or [])
+    tools = {t.name: t for t in spending.load_tools("CUST42", today=date(2026, 9, 18))}
+
+    result = run(tools, "get_spending_by_category", {"start_date": "2026-09-01", "end_date": "2026-09-30"})
+
+    assert seen == [(date(2026, 9, 1), date(2026, 9, 18))]
+    assert result["period"]["end_date"] == "2026-09-18"
+    with pytest.raises(ValueError, match="after today"):
+        tools["get_spending_by_category"].run({"start_date": "2026-09-20", "end_date": "2026-09-30"})
 
 
 # --------------------------------------------------------------------------
@@ -230,8 +249,8 @@ def test_basket_tool_without_sweeps_has_no_warning(tools, monkeypatch):
 def test_balance_tool_formats_months_and_defaults_to_six(tools, monkeypatch):
     seen = []
 
-    def fake_trend(customer_id, months):
-        seen.append((customer_id, months))
+    def fake_trend(customer_id, months, as_of=None):
+        seen.append((customer_id, months, as_of))
         return [
             {"month": date(2026, 8, 1), "balance_eur": Decimal("4390.15")},
             {"month": date(2026, 9, 1), "balance_eur": Decimal("4723.58")},
@@ -241,7 +260,7 @@ def test_balance_tool_formats_months_and_defaults_to_six(tools, monkeypatch):
 
     result = run(tools, "get_monthly_balance_trend", {})
 
-    assert seen == [("CUST42", 6)]
+    assert seen == [("CUST42", 6, date(2026, 9, 30))]
     assert result["balances"] == [
         {"month": "2026-08", "balance_eur": 4390.15},
         {"month": "2026-09", "balance_eur": 4723.58},
@@ -251,7 +270,7 @@ def test_balance_tool_formats_months_and_defaults_to_six(tools, monkeypatch):
 def test_balance_tool_accepts_a_float_month_count_and_rejects_fractions(tools, monkeypatch):
     seen = []
     monkeypatch.setattr(
-        queries, "monthly_balance_trend", lambda customer_id, months: seen.append(months) or []
+        queries, "monthly_balance_trend", lambda customer_id, months, as_of=None: seen.append(months) or []
     )
 
     run(tools, "get_monthly_balance_trend", {"months": 1.0})
@@ -265,52 +284,15 @@ def test_balance_tool_accepts_a_float_month_count_and_rejects_fractions(tools, m
 # Calculation tools
 # --------------------------------------------------------------------------
 
-def test_prorated_amount_tool(tools):
-    assert run(tools, "calculate_prorated_amount", {"monthly_amount": 300, "days": 10}) == {
-        "amount_eur": 100.0
-    }
-    assert run(
-        tools,
-        "calculate_prorated_amount",
-        {"monthly_amount": 100, "days": 15, "days_in_month": 31},
-    ) == {"amount_eur": 48.39}
+def test_safe_to_spend_tool_returns_the_budget_for_today(monkeypatch):
+    from coach import budget
+    seen = []
+    monkeypatch.setattr(budget, "safe_to_spend",
+                        lambda customer_id, today: seen.append((customer_id, today)) or {"safe_to_spend_this_week": 91.27})
+    tools = {t.name: t for t in spending.load_tools("CUST42", today=date(2026, 9, 10))}
 
-
-def test_safe_to_spend_tool_matches_the_tested_calculation(tools):
-    result = run(
-        tools,
-        "calculate_safe_to_spend",
-        {
-            "current_balance": 1000,
-            "days_remaining": 10,
-            "committed_expenses": 400,
-            "irregular_reserve": 100,
-            "buffer": 100,
-        },
-    )
-    assert result["safe_total"] == 400.0
-    assert result["per_day"] == 40.0
-    assert result["per_week"] == 280.0
-    assert result["shortfall"] == 0.0
-
-
-def test_safe_to_spend_tool_accepts_a_float_day_count(tools):
-    result = run(tools, "calculate_safe_to_spend", {"current_balance": 500, "days_remaining": 5.0})
-    assert result["per_day"] == 100.0
-
-
-@pytest.mark.parametrize(
-    "arguments, error",
-    [
-        ({"current_balance": 100, "days_remaining": 0}, ValueError),
-        ({"current_balance": 100, "days_remaining": 2.5}, ValueError),
-        ({"current_balance": "100", "days_remaining": 5}, TypeError),
-        ({"current_balance": 100, "days_remaining": 5, "buffer": -1}, ValueError),
-    ],
-)
-def test_safe_to_spend_tool_rejects_bad_input(tools, arguments, error):
-    with pytest.raises(error):
-        tools["calculate_safe_to_spend"].run(arguments)
+    assert run(tools, "get_safe_to_spend", {}) == {"safe_to_spend_this_week": 91.27}
+    assert seen == [("CUST42", date(2026, 9, 10))]
 
 
 def test_safe_to_save_tool_matches_the_tested_calculation(tools):
