@@ -1,6 +1,6 @@
 # Fine-tuning plan
 
-**Status: steps 4-7 done** (POLICY.md, guardrail and prompt rules, test set in `evals/coach/`, Gemma baseline); Opus baseline needs a Claude key. Nothing is trained yet. Related: [SETUP.md](SETUP.md) (how the coach runs), [BASKETS.md](BASKETS.md) (spending rules), `evals/finnish/` (Finnish language check, on the `finnish-eval` branch).
+**Status: steps 1–10 done, pending native-speaker review** ([S_PANKKI_REFERENCE.md](S_PANKKI_REFERENCE.md) vocabulary/voice/rules, [POLICY.md](POLICY.md), guardrail and prompt rules, test set in `evals/coach/`, Gemma + Claude Opus baselines, and 280 verified training/validation conversations in `training/`). Nothing is trained yet. Related: [SETUP.md](SETUP.md) (how the coach runs), [BASKETS.md](BASKETS.md) (spending rules), `evals/finnish/` (Finnish language check).
 
 ## Goal
 
@@ -108,32 +108,33 @@ A refusal example is shorter: no tool call, just the decline.
 | Share | Kind | Why |
 |---|---|---|
 | ~70% | Normal coaching in good Finnish bank language | vocabulary, tone, correct numbers |
-| ~20% | Refusals and redirects (risky, off-topic, needs care) | safe topics |
+| ~15% | Advice limits (stocks, loans, taxes) | `coach/guardrail.py` passes these to Gemma as `allowed`, so Gemma must explain generally and refer to S-Bank's experts |
+| ~5% | Direct refusals and multi-turn edge cases | `coach/guardrail.py` already blocks single-turn `refuse`/`care` before Gemma runs; kept as defense-in-depth |
 | ~10% | Borderline but allowed ("bars", "alcohol spending", "cut my restaurant costs") | so the model doesn't over-refuse |
 
-Aim for 1,000–3,000 examples, in both Finnish and English.
+Aim for **200–400 clean examples** (in both Finnish and English) rather than thousands of noisy ones — fast to review in one evening and trains in ~15 minutes.
 
 ## Steps
 
-**A. Gather material (team)**
-1. Bank vocabulary: 30–60 S-Bank terms. Ask the S-Bank mentors for their term list first.
-2. Tone of voice: write S-Bank's style rules in our own words (ask for their style guide).
-3. Topic rules: agree on the table above with the S-Bank mentors, especially investment and loan advice.
+**A. Gather material (team)** — *compiled in [S_PANKKI_REFERENCE.md](S_PANKKI_REFERENCE.md)*
+1. Bank vocabulary: 60 verified S-Bank/finance terms + 10 proposed Finnish spending-category labels in [S_PANKKI_REFERENCE.md](S_PANKKI_REFERENCE.md#bank-vocabulary) (note: S-Pankki prefers *puskuri* / *taloudellinen puskuri* alongside *hätävara*).
+2. Tone of voice: standard *sinuttelu* (`sinä`, not `sä`), "Suomen mutkattomin pankki" non-judgmental clarity, and bilingual sentence patterns in [S_PANKKI_REFERENCE.md](S_PANKKI_REFERENCE.md#s-pankki-tone-of-voice).
+3. Topic rules: verified help services (`Oikeuspalveluvirasto`, `Peluuri`, `Velkalinja`, `MIELI`, `112`) and MiFID II / KKV / Tax boundaries in [S_PANKKI_REFERENCE.md](S_PANKKI_REFERENCE.md#topic-rules-for-the-coach); confirm remaining mentor questions there.
 
 **B. Prepare**
 4. `POLICY.md`: the topic rules with example questions and ideal answers, both languages.
-5. Prompt rules and the guardrail: improve the coach today, before any training.
+5. Prompt rules and the guardrail: improve the coach today, before any training, and freeze `coach/agent.py`'s prompt wording before generating training data.
 6. Test set: extend `evals/finnish/` with correctness, safety and English questions, and a comparison table.
 7. Baseline: run the test set on today's Gemma and on Claude Opus 5.5.
 
-**C. Training data**
-8. Generate draft conversations: run the coach over many customers and *training* questions (not the test questions); save the full conversations.
-9. Fix them: a native speaker corrects the answers in the review sheet, using the glossary and tone, and writes the refusals.
-10. Keep the test questions out of the training data: use customers not listed in `evals/coach/cases_generated.json` (`customers`) or `cases.json`, and different question wording.
+**C. Training data (`training/`)**
+8. Generate conversations (`python -m training.generate`): executes the real spending, budget, peer, and calculation tools offline against local CSVs (`training/csv_queries.py`, verified 70/70 cent-for-cent against PostgreSQL) across 280 distinct non-eval customers (`training/train.jsonl` = 250, `training/val.jsonl` = 30; 80% FI / 20% EN), recording the **exact full runtime system prompt** and OpenAI tool definitions from `agent._prepare(customer_id)`.
+9. Filter and fix them: `training/generate.py` and `tests/test_training_data.py` assert zero `evals/finnish/checks.py` errors or warnings and zero internal field leaks across all 280 examples; `training/PREVIEW.md` provides one representative example per scenario (`S01`–`S22`) for native-speaker review and wording tweaks.
+10. Keep the test questions out of the training data: `training/generate.py` excludes every customer ID and question in `evals/coach/cases.json`, `evals/coach/cases_generated.json`, `evals/finnish/questions.json`, and demo profiles, and enforces 100% customer-disjoint `train.jsonl` and `val.jsonl` splits.
 
 **D. Train and serve**
-11. Train a LoRA adapter: 1–3 GPU hours on Verda or Modal (Modal Dojo), roughly €10–30. Tools: Hugging Face TRL + PEFT, or Unsloth.
-12. Serve it: load the adapter in vLLM (`--enable-lora`), or merge it into the model and upload to a private Hugging Face repo; point the Verda deployment at it. The code doesn't change (`--served-model-name gemma-coach`). To check early: does LoRA work together with our on-the-fly `--quantization fp8`?
+11. Train a LoRA adapter (~15–60 GPU minutes on Verda or Modal, Hugging Face TRL + PEFT or Unsloth). Format messages with `AutoTokenizer.from_pretrained("google/gemma-4-31B-it").apply_chat_template(..., tools=...)` so tool calls match vLLM, compute **loss on `assistant` turns only** (never on `system`/`user`/`tool` JSON), and keep training conservative (`1–2` epochs, LR `5e-5` to `1e-4`).
+12. Serve it: **safer path** is to merge the adapter into the BF16 model after training (`merge_and_unload()`), upload the merged weights to a private Hugging Face repo, and point our existing Verda deployment (`--quantization fp8`) at it — avoiding vLLM incompatibilities between `--enable-lora` and on-the-fly `--quantization fp8`. The app code doesn't change (`--served-model-name gemma-coach`). Remember Verda cold-starts take 15–30 min ([SETUP.md](SETUP.md)), so budget time for that redeploy.
 
 **E. Prove it**
 13. Run the test set on the fine-tuned model.
