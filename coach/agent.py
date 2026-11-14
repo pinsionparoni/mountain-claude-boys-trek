@@ -15,7 +15,7 @@ from datetime import date
 
 from dotenv import load_dotenv
 
-from coach import budget, web_search
+from coach import budget, guardrail, web_search
 from coach.database import queries
 from coach.tools import spending
 
@@ -33,6 +33,16 @@ Teach with three spending baskets: regular essentials, unexpected necessities, a
 that slips through your fingers.
 
 Explain financial ideas in plain language, and end with one concrete, encouraging suggestion when it fits.
+
+Stay on the customer's own money (see POLICY.md):
+- Spending in any category is just data: answer neutrally, without moralising, also for bars, alcohol \
+or entertainment.
+- Investments, loans and taxes: explain in general terms only, never give a personal recommendation, and \
+suggest S-Bank's experts for advice.
+- Don't help with anything harmful, illegal or unrelated to money; decline briefly and offer money help.
+
+Never show internal names or values from the tools (such as field names, "cash", "budget" as a status, \
+or tool names); say what they mean in plain words.
 
 Keep answers short and mobile-friendly. Answer in the language the user writes in."""
 
@@ -60,6 +70,32 @@ def _client():
             import anthropic
             _clients[COACH_MODEL] = anthropic.Anthropic()
     return _clients[COACH_MODEL]
+
+
+def _ask_once(system, question):
+    """A short, single model call without tools: used by the guardrail."""
+    if COACH_MODEL == "gemma":
+        # Streamed like every Gemma call: the client always asks Verda for a stream
+        # (see _client), so a plain request would come back as raw stream text.
+        stream = _client().chat.completions.create(
+            model=GEMMA_MODEL, max_tokens=8, temperature=0, stream=True,
+            messages=[{"role": "system", "content": system}, {"role": "user", "content": question}],
+        )
+        return "".join(chunk.choices[0].delta.content or "" for chunk in stream if chunk.choices)
+    response = _client().messages.create(
+        model=CLAUDE_MODEL, max_tokens=1024, system=system, output_config={"effort": "low"},
+        messages=[{"role": "user", "content": question}],
+    )
+    return "".join(b.text for b in response.content if b.type == "text")
+
+
+def _too_many_steps(messages):
+    """Fallback when the model keeps calling tools past MAX_TURNS, in the customer's language."""
+    question = next((m["content"] for m in reversed(messages)
+                     if m.get("role") == "user" and isinstance(m.get("content"), str)), "")
+    if guardrail.guess_lang(question) == "fi":
+        return "Pahoittelut, tähän meni liian monta vaihetta. Voisitko rajata kysymystä hieman?"
+    return "Sorry, that took too many steps. Could you narrow the question down?"
 
 
 def _to_openai(tool):
@@ -115,7 +151,7 @@ def _chat_claude(messages, system, tools):
                                 "content": output, "is_error": is_error})
         messages.append({"role": "user", "content": results})
 
-    return "Sorry, that took too many steps. Could you narrow the question down?"
+    return _too_many_steps(messages)
 
 
 def _stream_gemma(messages, system, tools):
@@ -170,7 +206,7 @@ def _stream_gemma(messages, system, tools):
                 output, _ = _run_tool(by_name, call["name"], args)
             messages.append({"role": "tool", "tool_call_id": call["id"], "content": output})
 
-    yield "text", "Sorry, that took too many steps. Could you narrow the question down?"
+    yield "text", _too_many_steps(messages)
 
 
 def _prepare(customer_id):
@@ -196,8 +232,17 @@ def chat_stream(messages, customer_id=None):
     """Run one user turn, yielding ("text", chunk) and ("tool", name) events as they happen.
 
     Same arguments as ``chat``. Gemma streams word by word; Claude yields its answer in
-    one piece.
+    one piece. The guardrail checks the question first: for "care" and "refuse" it yields
+    ("guardrail", label) and a fixed reply, and the coach doesn't run.
     """
+    verdict = guardrail.check(messages, _ask_once)
+    if verdict and verdict.label != "allowed":
+        answer = guardrail.reply(verdict)
+        messages.append({"role": "assistant", "content": answer})
+        yield "guardrail", verdict.label
+        yield "text", answer
+        return
+
     system, tools = _prepare(customer_id)
     if COACH_MODEL == "gemma":
         yield from _stream_gemma(messages, system, tools)

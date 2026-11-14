@@ -14,6 +14,8 @@ Endpoints:
   - ``tool``: ``{"name": "get_safe_to_spend"}`` while the coach looks something up,
     so the app can show "checking your spending…".
   - ``text``: ``{"text": "..."}``, a piece of the answer; append them in order.
+  - ``guardrail``: ``{"label": "care" | "refuse"}`` when the question got a fixed reply
+    instead of the coach (see POLICY.md).
   - ``error``: ``{"message": "..."}`` if something went wrong.
   - ``done``: ``{}`` at the end.
 
@@ -121,8 +123,10 @@ def chat(request: ChatRequest):
             for kind, value in agent.chat_stream(messages, customer_id=request.customer_id):
                 if kind == "text":
                     yield _event("text", {"text": value})
-                else:
+                elif kind == "tool":
                     yield _event("tool", {"name": value})
+                elif kind == "guardrail":
+                    yield _event("guardrail", {"label": value})
         except Exception as e:  # the stream has started, so report errors in it
             yield _event("error", {"message": f"The coach couldn't answer: {e}"})
         yield _event("done", {})

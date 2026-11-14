@@ -1,0 +1,22 @@
+[
+  {"id": "budget-1", "customer_id": "CUST00226", "question": "Paljonko voin turvallisesti käyttää rahaa tällä viikolla?"},
+  {"id": "budget-2", "customer_id": "CUST00050", "question": "Paljonko minulla on vielä käytettävissä tässä kuussa?"},
+  {"id": "budget-3", "customer_id": "CUST00127", "question": "Onko minulla varaa käydä ravintolassa tänä viikonloppuna?"},
+  {"id": "baskets-1", "customer_id": "CUST00050", "question": "Mihin rahani menivät viime kuussa?"},
+  {"id": "baskets-2", "customer_id": "CUST00226", "question": "Mihin rahani menevät? Jaa kulutukseni kolmeen koriin viime kuukaudelta."},
+  {"id": "baskets-3", "customer_id": "CUST00001", "question": "Paljonko yllättäviä menoja minulla on ollut tänä vuonna?"},
+  {"id": "category-1", "customer_id": "CUST00127", "question": "Paljonko käytin taksiin viime kuussa?"},
+  {"id": "category-2", "customer_id": "CUST00001", "question": "Paljonko kulutan ruokaan kuukaudessa?"},
+  {"id": "category-3", "customer_id": "CUST00050", "question": "Kuinka paljon rahaa menee kahviloihin ja pikaruokaan?"},
+  {"id": "transactions-1", "customer_id": "CUST00226", "question": "Mitkä olivat suurimmat ostokseni elokuussa?"},
+  {"id": "trend-1", "customer_id": "CUST00001", "question": "Miten tilini saldo on kehittynyt viime kuukausina?"},
+  {"id": "whatif-1", "customer_id": "CUST00001", "question": "Paljonko säästäisin vuodessa, jos vähentäisin ravintolakuluja 20 %?"},
+  {"id": "whatif-2", "customer_id": "CUST00127", "question": "Entä jos puolittaisin viihdemenoni, paljonko jäisi käteen?"},
+  {"id": "save-1", "customer_id": "CUST00050", "question": "Paljonko voisin säästää joka kuukausi?"},
+  {"id": "peers-1", "customer_id": "CUST00050", "question": "Millainen kuluttaja olen?"},
+  {"id": "peers-2", "customer_id": "CUST00001", "question": "Kulutanko enemmän kuin muut ikäiseni?"},
+  {"id": "peers-3", "customer_id": "CUST00127", "question": "Mihin käytän rahaa eri tavalla kuin muut nuoret?"},
+  {"id": "explain-1", "customer_id": "CUST00226", "question": "Mitä tarkoittaa hätävara ja paljonko minun pitäisi säästää sitä?"},
+  {"id": "explain-2", "customer_id": "CUST00050", "question": "Mikä ero on välttämättömillä menoilla ja arjen kulutuksella?"},
+  {"id": "chat-1", "customer_id": "CUST00127", "question": "Moi! Mitä kaikkea voit auttaa minua tekemään?"}
+]
