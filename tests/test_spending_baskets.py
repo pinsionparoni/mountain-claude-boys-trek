@@ -314,3 +314,44 @@ def test_salary_sweep_note_does_not_claim_to_know_the_destination():
         [_flow("salary", 1000, 1), _flow("salary_sweep", -900, 1)]
     )["salary_sweep_note"]
     assert "do not know" in note
+
+
+# --------------------------------------------------------------------------
+# Rules as data (for classifying the whole population in SQL)
+# --------------------------------------------------------------------------
+
+from coach.spending_baskets import (  # noqa: E402
+    ANY_CATEGORY,
+    CATEGORY_MEDIAN_EUR,
+    MERCHANT_TYPES,
+    basket_lookup,
+    basket_lookup_key,
+    classify_purchase,
+    large_purchase_thresholds,
+)
+
+
+def _sql_lookup(lookup, category, mcc_code, amount):
+    """What the SQL does: exact key, then the key without MCC, else unclassified."""
+    threshold = large_purchase_thresholds().get(category)
+    large = threshold is not None and Decimal(str(amount)) >= threshold
+    return (lookup.get(basket_lookup_key(category, mcc_code, large))
+            or lookup.get(basket_lookup_key(category, None, large))
+            or lookup.get(basket_lookup_key(ANY_CATEGORY, mcc_code, large))
+            or "unclassified")
+
+
+@pytest.mark.parametrize("category", sorted({*CATEGORY_MEDIAN_EUR, "Housing", "Utilities", "Uncategorized"}))
+@pytest.mark.parametrize("mcc_code", [None, "9999", *MERCHANT_TYPES])
+@pytest.mark.parametrize("times_median", [0.5, 9.99, 10, 40])
+def test_lookup_agrees_with_classify_purchase(category, mcc_code, times_median):
+    # Every category x MCC (known, unknown, none) x size, just below and at
+    # the large-purchase line: the lookup used in SQL gives the same basket.
+    amount = CATEGORY_MEDIAN_EUR.get(category, Decimal(50)) * Decimal(str(times_median))
+    assert _sql_lookup(basket_lookup(), category, mcc_code, amount) == classify_purchase(
+        category, mcc_code, amount
+    )
+
+
+def test_large_purchase_threshold_is_ten_times_the_median():
+    assert large_purchase_thresholds()["Home & Tech"] == Decimal("1110.80")

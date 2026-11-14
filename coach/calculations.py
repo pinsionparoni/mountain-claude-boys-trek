@@ -366,3 +366,193 @@ def what_if_reduce_many(
         "yearly_saving": _money(total_monthly * _MONTHS_PER_YEAR),
         "by_category": per_category,
     }
+
+
+# --------------------------------------------------------------------------
+# Peer comparison: "what kind of spender am I?"
+# --------------------------------------------------------------------------
+
+# Statistics Finland's household budget survey age bands, so our "people your
+# age" lines up with official benchmarks. Smallest group in the data: 75+
+# with 130 customers. (The data has 150 customers aged exactly 18 against
+# 30-55 for each age 19-24: probably younger customers rounded up.)
+AGE_GROUPS = (
+    (18, 24, "18–24"),
+    (25, 34, "25–34"),
+    (35, 44, "35–44"),
+    (45, 54, "45–54"),
+    (55, 64, "55–64"),
+    (65, 74, "65–74"),
+    (75, None, "75+"),
+)
+
+# Below this many peers a median says little; the comparison is skipped.
+MIN_PEERS = 30
+
+# Spending in the top or bottom quarter of peers counts as clearly
+# above or below them; the middle half is typical.
+_ABOVE_PCT = 75
+_BELOW_PCT = 25
+
+TOTAL = "Total"
+
+
+def age_group(age: int) -> str:
+    """The age band a customer belongs to, e.g. 21 -> "18–24"."""
+    if isinstance(age, bool) or not isinstance(age, int):
+        raise TypeError("age must be a whole number")
+    for low, high, label in AGE_GROUPS:
+        if age >= low and (high is None or age <= high):
+            return label
+    raise ValueError(f"age must be at least {AGE_GROUPS[0][0]}, got {age}")
+
+
+def _quantile(sorted_values: list, q: Decimal) -> Decimal:
+    """Linear-interpolation quantile (as numpy and Excel PERCENTILE.INC)."""
+    position = (len(sorted_values) - 1) * q
+    lower = int(position)
+    upper = min(lower + 1, len(sorted_values) - 1)
+    weight = position - lower
+    return sorted_values[lower] + (sorted_values[upper] - sorted_values[lower]) * weight
+
+
+def _percentile_rank(sorted_values: list, value: Decimal) -> Decimal:
+    """
+    Share of peers spending less, counting ties as half: 0-100, 1 decimal.
+
+    "Spends more than X% of peers." Ties matter because many peers spend
+    exactly 0 € in some categories.
+    """
+    less = sum(1 for v in sorted_values if v < value)
+    equal = sum(1 for v in sorted_values if v == value)
+    rank = (Decimal(less) + Decimal(equal) / 2) * 100 / len(sorted_values)
+    return rank.quantize(Decimal("0.1"), rounding=ROUND_HALF_UP)
+
+
+def _level(rank: Decimal) -> str:
+    if rank >= _ABOVE_PCT:
+        return "above_peers"
+    if rank <= _BELOW_PCT:
+        return "below_peers"
+    return "typical"
+
+
+def _compare(mine: Decimal, peers: list) -> dict:
+    """Customer's monthly amount against one peer group's monthly amounts."""
+    peers = sorted(peers)
+    median = _quantile(peers, Decimal("0.5"))
+    rank = _percentile_rank(peers, mine)
+    return {
+        "peer_median_monthly": _money(median),
+        "peer_typical_range_monthly": [
+            _money(_quantile(peers, Decimal("0.25"))),
+            _money(_quantile(peers, Decimal("0.75"))),
+        ],
+        "difference_from_median_pct": (
+            float(((mine - median) * 100 / median).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
+            if median > 0 else None
+        ),
+        "spends_more_than_pct_of_peers": float(rank),
+        # The same rank read from the other side, so the coach never has to
+        # subtract: "you spend less than 96% of people your age".
+        "spends_less_than_pct_of_peers": float(100 - rank),
+        "level": _level(rank),
+    }
+
+
+def compare_with_peers(
+    *,
+    customer_spending: Mapping[str, Number],
+    customer_age: int,
+    peers: Iterable[Mapping],
+    months: int,
+    exclude_from_profile: Iterable[str] = (),
+) -> dict:
+    """
+    Compare one customer's spending with people their age and with everyone.
+
+    ``customer_spending`` maps category -> total euros spent in the period.
+    ``peers`` are the *other* customers, each ``{"age": int, "spending":
+    {category: total}}`` for the same period (the caller leaves the customer
+    out). A category missing from someone's spending counts as 0 €.
+    ``months`` is the period's length: totals become monthly averages.
+
+    Per category and for the total: the customer's monthly amount, then for
+    ``age_group`` and ``everyone`` the peer median, the typical range (25th
+    to 75th percentile), the difference from the median in percent, the
+    share of peers who spend less (``spends_more_than_pct_of_peers``) and
+    who spend more (``spends_less_than_pct_of_peers``), and a ``level``: ``above_peers`` (top
+    quarter), ``below_peers`` (bottom quarter) or ``typical``. The
+    ``profile`` lists categories that stand out against the age group,
+    largest gap first: plain facts the coach can turn into "what kind of
+    spender am I?". ``exclude_from_profile`` keeps categories (e.g. rent and
+    utilities, which reflect living situation rather than habits) out of the
+    profile; they stay in ``by_category`` and in the total. Only aggregates
+    are returned, never another customer's data.
+    """
+    if not isinstance(months, int) or isinstance(months, bool) or months < 1:
+        raise ValueError("months must be a positive whole number")
+    group = age_group(customer_age)
+    excluded = set(exclude_from_profile)
+
+    peers = list(peers)
+    group_peers = [p for p in peers if age_group(p["age"]) == group]
+    if len(group_peers) < MIN_PEERS:
+        raise ValueError(
+            f"Only {len(group_peers)} peers aged {group}; at least {MIN_PEERS} are needed"
+        )
+
+    categories = sorted(
+        set(customer_spending).union(*(p["spending"] for p in peers))
+    )
+
+    def monthly(spending: Mapping, category: str) -> Decimal:
+        return _non_negative(category, spending.get(category, 0)) / months
+
+    def total_monthly(spending: Mapping) -> Decimal:
+        return sum((monthly(spending, c) for c in categories), Decimal(0))
+
+    rows = {}
+    for category in categories + [TOTAL]:
+        if category == TOTAL:
+            mine = total_monthly(customer_spending)
+            group_values = [total_monthly(p["spending"]) for p in group_peers]
+            all_values = [total_monthly(p["spending"]) for p in peers]
+        else:
+            mine = monthly(customer_spending, category)
+            group_values = [monthly(p["spending"], category) for p in group_peers]
+            all_values = [monthly(p["spending"], category) for p in peers]
+        rows[category] = {
+            "my_monthly": _money(mine),
+            "age_group": _compare(mine, group_values),
+            "everyone": _compare(mine, all_values),
+        }
+
+    def standouts(level: str) -> list:
+        found = [
+            {
+                "category": c,
+                "my_monthly": rows[c]["my_monthly"],
+                "peer_median_monthly": rows[c]["age_group"]["peer_median_monthly"],
+                "spends_more_than_pct_of_peers": rows[c]["age_group"]["spends_more_than_pct_of_peers"],
+                "spends_less_than_pct_of_peers": rows[c]["age_group"]["spends_less_than_pct_of_peers"],
+            }
+            for c in categories
+            if c not in excluded and rows[c]["age_group"]["level"] == level
+        ]
+        # Furthest from the middle first.
+        return sorted(found, key=lambda r: -abs(r["spends_more_than_pct_of_peers"] - 50))
+
+    return {
+        "age_group": group,
+        "peers_in_age_group": len(group_peers),
+        "peers_everyone": len(peers),
+        "months": months,
+        "total": rows[TOTAL],
+        "by_category": {c: rows[c] for c in categories},
+        "profile": {
+            "overall_level": rows[TOTAL]["age_group"]["level"],
+            "above_peers": standouts("above_peers"),
+            "below_peers": standouts("below_peers"),
+        },
+    }
