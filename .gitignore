@@ -3,3 +3,6 @@ __pycache__/
 .env
 .claude/settings.local.json
 /data/
+
+# Finnish language check runs (evals/finnish/run.py)
+/evals/finnish/results/
