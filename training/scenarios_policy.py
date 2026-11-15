@@ -60,8 +60,8 @@ def build_s14(ctx, cid: str, today: date, lang: str, variant: int) -> dict:
                 f"Paljonko rahaa minulla meni baari-iltoihin {FI_MONTH_IN[m_num]}?",
                 f"Kuinka paljon kulutin baareihin {FI_MONTH_IN[m_num]}?",
                 f"Näytä paljonko käytin korttia baareissa {FI_MONTH_IN[m_num]}.",
-                f"Mikä osuus {FI_MONTH_IN[m_num]} tehdyistä ravintolaostoistani meni baareihin?",
                 "Tarkistatko baariostosteni yhteissumman viime kuulta?",
+                "Paljonko baarit maksoivat minulle viime kuussa?",
             ]
             q = q_pool[(variant // 3) % len(q_pool)]
             if bar_tot > 0:
@@ -143,6 +143,7 @@ def build_s14(ctx, cid: str, today: date, lang: str, variant: int) -> dict:
                 "Paljonko olen käyttänyt viihteeseen ja tapahtumalippuihin kolmen viime kuukauden aikana?",
                 "Näytä kolmen kuukauden yhteenveto viihteen ja vapaa-ajan kulutuksestani.",
                 "Kuinka suuri summa minulla kuluu kuukaudessa viihteeseen ja rientoihin?",
+                "Montako euroa meni viihteeseen kolmen viime kuukauden aikana?",
             ]
             q = q_pool[(variant // 3) % len(q_pool)]
             if top_m:
@@ -261,6 +262,8 @@ def build_s15(ctx, cid: str, today: date, lang: str, variant: int) -> dict:
             f"Minulla hupenee rahaa noutoruokaan, kahviloihin ja iltamenoihin. Paljonko säästäisin vuodessa leikkaamalla niistä {pct} %?",
             f"Haluaisin vähentää ravintola- ja baarikäyntejä {pct} % ilman että koko sosiaalinen elämä loppuu. Mitä se tarkoittaisi euroissa?",
             f"Viikonloppujen ravintola- ja baarilaskut karkaavat helposti käsistä. Lasketko {pct} % säästöarvion ja annatko käytännön vinkin?",
+            "Haluan vähentää ulkona syömistä. Mistä aloittaisin?",
+            "Ravintolat vievät liikaa rahaa, auta minua.",
         ]
         q = q_pool[variant % len(q_pool)]
         sub_parts = []
@@ -377,6 +380,17 @@ S16_CONCEPT_EN = [
         "- **Investing Bonus via Säästäjä:** puts small monthly amounts to work over time through time diversification, though fund investing always involves market risk and values can go down as well as up.\n\n"
         "I don't recommend a specific fund, though S-mobiili's **Säästäjä** service and **S-Pankki's advisors** can help match a fund profile to your goals."
     ),
+]
+
+
+def _reword(pool, question, existing_start):
+    """A new wording of an existing question, with the existing (reviewed) answer."""
+    return (question, next(a for q, a in pool if q.startswith(existing_start)))
+
+
+S16_CONCEPT_FI += [
+    _reword(S16_CONCEPT_FI, "Mihin rahastoon minun kannattaa laittaa rahani?", "Mikä S-Pankin rahasto olisi"),
+    _reword(S16_CONCEPT_FI, "Onko indeksirahasto hyvä sijoitus minulle?", "Kannattaako minun ostaa yksittäisen"),
 ]
 
 
@@ -520,7 +534,7 @@ S17_CONCEPT_EN = [
     ),
     (
         "How should I compare a dealership hire-purchase plan against a bank loan like S-Laina?",
-        "I don't recommend taking credit or pick between lenders, though here is what to compare side by side:\n\n"
+        "I can't recommend taking credit or choose between lenders, but here is what to compare side by side:\n\n"
         "- Look past the headline monthly instalment to the **effective annual interest rate**, setup fees, monthly account fees, and any balloon payment at the end.\n"
         "- Factor running costs, such as insurance, maintenance, and fuel or charging, into your regular essentials alongside the loan payment.\n\n"
         "Any figures here are an **estimate, not a binding loan offer**. **S-Pankki's credit specialists** can assess formal loan terms for your situation."
@@ -528,9 +542,12 @@ S17_CONCEPT_EN = [
 ]
 
 
+S17_CONCEPT_FI += [_reword(S17_CONCEPT_FI, "Saanko lainaa auton ostoon?", "Harkitsen uutta autoa")]
+
+
 def build_s17(ctx, cid: str, today: date, lang: str, variant: int) -> dict:
     # Variants where customer asks either about covering a tight week with credit OR checking budget room for a loan payment
-    if (lang == "fi" and variant < 6) or (lang == "en" and variant == 0):
+    if (lang == "fi" and variant < 8) or (lang == "en" and variant == 0):
         if variant % 2 == 0:
             # Tight budget / pre-payday question: NEVER suggest taking credit to cover a shortfall!
             s_str, s_data = ctx.run_tool(cid, today, "get_safe_to_spend", {})
@@ -542,6 +559,7 @@ def build_s17(ctx, cid: str, today: date, lang: str, variant: int) -> dict:
                     "Tili näyttää aika pieneltä ennen palkkapäivää — kannattaisiko minun nostaa luottoa tai pikaluotto loppukuun menoihin?",
                     "Rahat ovat tiukilla tällä viikolla, olisiko luottokortin tai kulutusluoton käyttö fiksu tapa paikata budjettia?",
                     "Pitäisikö minun ottaa pieni kulutusluotto arjen ostoksiin, jotta selviän seuraavaan palkkapäivään?",
+                    "Kannattaako ottaa kulutusluottoa, kun rahat eivät riitä?",
                 ]
                 q = q_pool[(variant // 2) % len(q_pool)]
                 ans = (
@@ -567,12 +585,6 @@ def build_s17(ctx, cid: str, today: date, lang: str, variant: int) -> dict:
             s6, e6 = _n_complete_months_bounds(today, 6)
             b_args = {"start_date": s6, "end_date": e6}
             b_str, b_data = ctx.run_tool(cid, today, "get_basket_summary", b_args)
-            inc_m = round(sum(
-                f["monthly_average_eur"] for f in b_data["financial_flows"]
-                if f["transaction_type"] in ("salary", "other_income") and f["monthly_average_eur"] > 0
-            ), 2)
-            out_m = b_data["monthly_average_eur"]
-            surplus_m = round(inc_m - out_m, 2)
             target_eur = (250, 350, 450)[(variant // 2) % 3]
             q_pool = [
                 f"Kestääkö talouteni uuden lainan, jonka kuukausierä olisi noin {target_eur} €?",
@@ -580,31 +592,37 @@ def build_s17(ctx, cid: str, today: date, lang: str, variant: int) -> dict:
                 f"Harkitsen remonttilainaa noin {target_eur} €/kk kuukausierällä, miltä budjettini näyttää sen suhteen?",
             ]
             q = q_pool[(variant // 2) % len(q_pool)]
-            # Only amounts the tool returned: each income flow and the spending, never their difference.
-            incomes = {f["transaction_type"]: f["monthly_average_eur"] for f in b_data["financial_flows"]
-                       if f["transaction_type"] in ("salary", "other_income") and f["monthly_average_eur"] > 0}
-            if "salary" in incomes:
-                income_txt = f"sait palkkaa keskimäärin {eur_fi(incomes['salary'])}/kk"
-                if "other_income" in incomes:
-                    income_txt += f" ja muita tuloja {eur_fi(incomes['other_income'])}/kk"
-            elif incomes:
-                income_txt = f"sait tuloja keskimäärin {eur_fi(incomes['other_income'])}/kk"
+            # The surplus comes from calculate_safe_to_save (as in S12); the answer only compares it
+            # with the payment, so the model never subtracts amounts itself.
+            sv_args = {
+                "monthly_income": b_data["monthly_income_eur"],
+                "monthly_mandatory_regular": b_data["baskets"]["regular_essentials"]["monthly_average_eur"],
+                "monthly_mandatory_irregular": b_data["baskets"]["unexpected_necessities"]["monthly_average_eur"],
+                "monthly_everyday": b_data["baskets"]["everyday_spending"]["monthly_average_eur"],
+            }
+            sv_str, sv_data = ctx.run_tool(cid, today, "calculate_safe_to_save", sv_args)
+            surplus = sv_data["surplus"]
+            if surplus <= 0:
+                fit = ("Menosi ovat olleet keskimäärin tulojasi suuremmat, joten uusi kuukausierä kiristäisi "
+                       "budjettiasi entisestään.")
             else:
-                income_txt = "tilillesi ei tullut palkkaa tai muita tuloja"
-            verdict = "tulot ovat riittäneet menoihin" if surplus_m >= 0 else "menot ovat olleet tuloja suuremmat"
+                fit = (f"Tuloistasi on jäänyt menojen jälkeen yli keskimäärin {eur_fi(surplus)} kuukaudessa. "
+                       + (f"Noin {target_eur} euron kuukausierä mahtuisi tähän, mutta se veisi siitä suuren osan."
+                          if surplus >= target_eur else
+                          f"Noin {target_eur} euron kuukausierä olisi tätä suurempi, joten se kiristäisi budjettiasi."))
             ans = (
-                f"Kuuden viime täyden kuukauden ({range_fi(s6, e6)}) aikana {income_txt}. "
-                f"Menosi olivat keskimäärin {eur_fi(out_m)}/kk, eli {verdict}.\n\n"
+                f"Kuuden viime täyden kuukauden ({range_fi(s6, e6)}) aikana {fit[0].lower() + fit[1:]}\n\n"
                 f"Huomaa, että tämä tulojen ja menojen vertailu on vain arjen budjetin **suuntaa antava arvio, ei lainatarjous** eikä luottopäätös. "
                 f"Lainan mitoituksessa tulee huomioida **todellinen vuosikorko**, lainan **kokonaiskustannukset**, puskuri korkojen nousuun "
                 f"sekä yllättävät menot.\n\n"
                 f"Varsinaisen maksukykyarvion ja lainapäätöksen saat hakemuksella **S-Pankin luotonmyönnöstä ja laina-asiantuntijoilta**."
             )
             return ctx.pack(cid, today, "S17_advice_limits_loans", "advice_limits", lang, q,
-                            [("call_1", "get_basket_summary", b_args, b_str)], ans)
+                            [("call_1", "get_basket_summary", b_args, b_str),
+                             ("call_2", "calculate_safe_to_save", sv_args, sv_str)], ans)
 
     if lang == "fi":
-        q, ans = S17_CONCEPT_FI[(variant - 6) % len(S17_CONCEPT_FI)]
+        q, ans = S17_CONCEPT_FI[(variant - 8) % len(S17_CONCEPT_FI)]
     else:
         q, ans = S17_CONCEPT_EN[(variant - 1) % len(S17_CONCEPT_EN)]
     return ctx.pack(cid, today, "S17_advice_limits_loans", "advice_limits", lang, q, [], ans)
@@ -675,6 +693,9 @@ S18_TAX_EN = [
 ]
 
 
+S18_TAX_FI += [_reword(S18_TAX_FI, "Saako remontista kotitalousvähennystä?", "Miten kotitalousvähennys toimii")]
+
+
 def build_s18(ctx, cid: str, today: date, lang: str, variant: int) -> dict:
     pool = S18_TAX_FI if lang == "fi" else S18_TAX_EN
     q, ans = pool[variant % len(pool)]
@@ -711,6 +732,9 @@ S19_EN = [
         "You can check your card's security limits or block it safely in S-mobiili under **Cards**. I'm happy to help review your budget or spending whenever you're ready."
     ),
 ]
+
+
+S19_FI += [_reword(S19_FI, "Voinko antaa pankkitunnukseni sinulle, niin tarkistat tilini?", "Tarvitsetko verkkopankkitunnukseni")]
 
 
 def build_s19(ctx, cid: str, today: date, lang: str, variant: int) -> dict:

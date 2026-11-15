@@ -204,26 +204,34 @@ def _n_months(today: date, n: int) -> tuple[str, str]:
 
 # Scenario plan: (code, builder, fi_count, en_count, val_fi, val_en)
 # Total = 224 FI + 56 EN = 280 examples; Val = 24 FI + 6 EN = 30 examples; Train = 250 examples.
+# Variants added after the first training set (step 2, 15 Nov 2026: new question wordings).
+ADDED_LATER = {
+    ("S01", "fi"): 3, ("S02", "fi"): 2, ("S02", "en"): 1, ("S03", "fi"): 3, ("S04", "fi"): 3, ("S04", "en"): 1,
+    ("S05", "fi"): 2, ("S06", "fi"): 2, ("S07", "fi"): 2, ("S08", "fi"): 2, ("S09", "fi"): 2, ("S10", "fi"): 3,
+    ("S10", "en"): 3, ("S11", "fi"): 2, ("S12", "fi"): 3, ("S12", "en"): 1, ("S13", "fi"): 4, ("S14", "fi"): 5,
+    ("S15", "fi"): 2, ("S16", "fi"): 2, ("S17", "fi"): 4, ("S18", "fi"): 1, ("S19", "fi"): 1,
+}
+
 SCENARIO_SPECS = [
-    ("S01", build_s01, 14, 4, 2, 0),
-    ("S02", build_s02, 14, 4, 1, 1),
-    ("S03", build_s03, 10, 2, 1, 0),
-    ("S04", build_s04, 18, 4, 2, 0),
-    ("S05", build_s05, 12, 2, 1, 0),
-    ("S06", build_s06, 8, 2, 1, 0),
-    ("S07", build_s07, 14, 4, 1, 1),
-    ("S08", build_s08, 15, 3, 2, 0),
-    ("S09", build_s09, 13, 3, 1, 0),
-    ("S10", build_s10, 13, 3, 1, 1),
-    ("S11", build_s11, 11, 3, 1, 0),
-    ("S12", build_s12, 8, 2, 1, 0),
-    ("S13", build_s13, 8, 2, 1, 0),
-    ("S14", build_s14, 13, 3, 1, 1),
-    ("S15", build_s15, 9, 3, 1, 0),
-    ("S16", build_s16, 13, 3, 2, 0),
-    ("S17", build_s17, 13, 3, 1, 1),
-    ("S18", build_s18, 8, 2, 1, 0),
-    ("S19", build_s19, 3, 1, 1, 0),
+    ("S01", build_s01, 17, 4, 2, 0),
+    ("S02", build_s02, 16, 5, 1, 1),
+    ("S03", build_s03, 13, 2, 1, 0),
+    ("S04", build_s04, 21, 5, 2, 0),
+    ("S05", build_s05, 14, 2, 1, 0),
+    ("S06", build_s06, 10, 2, 1, 0),
+    ("S07", build_s07, 16, 4, 1, 1),
+    ("S08", build_s08, 17, 3, 2, 0),
+    ("S09", build_s09, 15, 3, 1, 0),
+    ("S10", build_s10, 16, 6, 1, 1),
+    ("S11", build_s11, 13, 3, 1, 0),
+    ("S12", build_s12, 11, 3, 1, 0),
+    ("S13", build_s13, 12, 2, 1, 0),
+    ("S14", build_s14, 18, 3, 1, 1),
+    ("S15", build_s15, 11, 3, 1, 0),
+    ("S16", build_s16, 15, 3, 2, 0),
+    ("S17", build_s17, 17, 3, 1, 1),
+    ("S18", build_s18, 9, 2, 1, 0),
+    ("S19", build_s19, 4, 1, 1, 0),
     ("S20", build_s20, 3, 1, 0, 1),
     ("S21", build_s21, 2, 1, 1, 0),
     ("S22", build_s22, 2, 1, 0, 0),
@@ -523,7 +531,10 @@ def generate_all(seed: int = 20261114) -> tuple[list[dict], list[dict], list[dic
                         + f"\nAnswer was:\n{rec['messages'][-1].get('content', '')}"
                     )
 
-                is_val = variant >= (count - val_count)
+                # Validation = the last variants of the first set, so variants added later
+                # (ADDED_LATER: new question wordings at the end of each pool) are trained on.
+                first = count - ADDED_LATER.get((code, lang), 0)
+                is_val = first - val_count <= variant < first
                 split_prefix = "val" if is_val else "train"
                 rec_with_id = {"id": f"{split_prefix}-{code}-{lang}-{variant + 1:02d}", **rec}
                 if is_val:

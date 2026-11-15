@@ -72,6 +72,9 @@ S01_Q_FI = [
     "Paljonko rahaa on vapaasti käytettävissä tälle viikolle?",
     "Mikä summa minulla on varaa käyttää arjen ostoksiin tällä viikolla?",
     "Riittääkö käyttötilini saldo tälle viikolle ja paljonko voin käyttää?",
+    'Paljonko minulla on tuhlattavaa tämän viikon loppuun?',
+    'Riittääkö S-Tilin saldo palkkapäivään asti?',
+    'Uskallanko käydä vielä kaupassa ennen palkkapäivää?',
 ]
 S01_Q_EN = [
     "How much is safe for me to spend this week before payday?",
@@ -148,6 +151,12 @@ def build_s01(ctx, cid: str, today: date, lang: str, variant: int) -> dict:
                 f"sticking to {eur_en(safe)} keeps a safe cushion until your salary arrives."
             )
 
+    # Answer the yes/no question first (approved opener, step 4).
+    if q == "Riittääkö S-Tilin saldo palkkapäivään asti?":
+        opener = ("Kyllä, saldo riittää välttämättömiin menoihin palkkapäivään asti, mutta arjen ostoksiin jää "
+                  "vähemmän kuin budjettisi sallisi." if not cc["shortfall"]
+                  else "Ei aivan: saldo ei riitä kaikkiin välttämättömiin menoihin ennen palkkapäivää.")
+        ans = f"{opener}\n\n{ans}"
     return ctx.pack(cid, today, "S01_safe_to_spend_cash_limited", "coaching", lang, q,
                     [("call_1", "get_safe_to_spend", {}, out_str)], ans)
 
@@ -164,12 +173,15 @@ S02_Q_FI = [
     "Miten kuukausibudjettini jakautuu ja mitä jää tälle viikolle?",
     "Paljonko tälle viikolle jää käyttövaraa pakollisten menojen jälkeen?",
     "Missä mennään tämän kuun budjetissa, paljonko voin käyttää tällä viikolla?",
+    'Paljonko on käyttövaraa tälle viikolle?',
+    'Kerro lyhyesti, paljonko voin käyttää tällä viikolla.',
 ]
 S02_Q_EN = [
     "How is my monthly budget looking, and what can I safely spend this week?",
     "How much room do I have in my everyday budget this week?",
     "Based on my usual income and bills, what's safe to spend this week?",
     "How much of my monthly everyday budget is left for this week?",
+    'Am I OK to spend a bit this weekend?',
 ]
 
 
@@ -215,9 +227,9 @@ def build_s02(ctx, cid: str, today: date, lang: str, variant: int) -> dict:
         else:
             ans = (
                 f"Turvallinen käyttövarasi tälle viikolle on **{eur_fi(safe)}**.\n\n"
-                f"Luku perustuu kuukausibudjettiisi: kun tuloista eli {eur_fi(mb['monthly_income'])} summasta otetaan sivuun "
+                f"Luku perustuu kuukausibudjettiisi. Tulosi ovat {eur_fi(mb['monthly_income'])}, ja niistä otetaan ensin sivuun "
                 f"välttämättömät menot {eur_fi(mb['regular_essentials'])}, yllättävien menojen varaus "
-                f"{eur_fi(mb['unexpected_reserve'])} ja säästöt {eur_fi(mb['savings'])}, arjen kulutukseen jää "
+                f"{eur_fi(mb['unexpected_reserve'])} ja säästöt {eur_fi(mb['savings'])}. Arjen kulutukseen jää "
                 f"{eur_fi(mb['everyday_budget'])} kuussa. Tästä on jäljellä vielä {eur_fi(tm['remaining'])}, "
                 f"ja käyttötilin saldo {eur_fi(cc['current_balance'])} riittää hyvin palkkapäivään {date_fi(payday_d)} asti."
             )
@@ -242,6 +254,10 @@ def build_s02(ctx, cid: str, today: date, lang: str, variant: int) -> dict:
                 f"**Tip:** Anything left unspent at the end of the month makes a great addition to your financial buffer."
             )
 
+    # "Briefly" gets a short answer (approved, step 4).
+    if q == "Kerro lyhyesti, paljonko voin käyttää tällä viikolla.":
+        ans = (f"Tällä viikolla voit käyttää turvallisesti **{eur_fi(safe)}**. Käyttötilisi saldo "
+               f"{eur_fi(cc['current_balance'])} riittää hyvin palkkapäivään {date_fi(payday_d)} asti.")
     return ctx.pack(cid, today, "S02_safe_to_spend_budget_healthy", "coaching", lang, q,
                     [("call_1", "get_safe_to_spend", {}, out_str)], ans)
 
@@ -256,6 +272,9 @@ S03_Q_FI = [
     "Voinko käyttää rahaa ulkona syömiseen tänä viikonloppuna?",
     "Paljonko arjen budjettiani on jäljellä tälle viikolle?",
     "Riittääkö budjettini vielä arjen ostoksiin tässä kuussa?",
+    'Olenko jo ylittänyt tämän kuun budjetin?',
+    'Paljonko rahaa on enää loppukuuksi?',
+    'Pitäisikö minun jarruttaa kulutusta tässä kuussa?',
 ]
 S03_Q_EN = [
     "Do I have any room left in my budget to go out this weekend?",
@@ -309,6 +328,33 @@ def build_s03(ctx, cid: str, today: date, lang: str, variant: int) -> dict:
                 f"Pausing discretionary purchases until payday is the safest move right now."
             )
 
+    # Answer the yes/no question first (approved opener, step 4).
+    if q == "Olenko jo ylittänyt tämän kuun budjetin?":
+        opener = (f"Kyllä, tämän kuun arjen kulutuksen budjetti on ylittynyt "
+                  f"{eur_fi(tm['over_budget']).replace(' €', ' eurolla')}." if tm["over_budget"] > 0
+                  else "Et ole ylittänyt kuukausibudjettia, mutta tilisi saldo rajoittaa nyt kulutusta palkkapäivään asti.")
+        ans = f"{opener}\n\n{ans}"
+    if q == "Riittääkö budjettini vielä arjen ostoksiin tässä kuussa?":
+        if tm["over_budget"] > 0:
+            opener = "Ei riitä: tämän kuun arjen kulutuksen budjetti on jo ylittynyt."
+        elif not safe:
+            opener = (f"Budjetissa on vielä {eur_fi(tm['remaining'])} jäljellä, mutta tilisi saldo ei nyt riitä "
+                      f"arjen ostoksiin ennen palkkapäivää.")
+        else:
+            opener = (f"Budjetissa on vielä {eur_fi(tm['remaining'])} jäljellä, mutta tilisi saldo rajoittaa "
+                      f"kulutusta palkkapäivään asti.")
+        ans = f"{opener}\n\n{ans}"
+    if q in ("Onko minulla enää yhtään varaa kuluttaa tällä viikolla?",
+             "Voinko käyttää rahaa ulkona syömiseen tänä viikonloppuna?"):
+        opener = ("Tällä viikolla siihen ei valitettavasti ole varaa." if not safe
+                  else f"Vain vähän: turvallinen summa on tällä viikolla {eur_fi(safe)}.")
+        ans = f"{opener}\n\n{ans}"
+    if q == "Do I have any room left in my budget to go out this weekend?":
+        ans = ("Not this week, unfortunately." if not safe else "Only a little.") + f"\n\n{ans}"
+    if q in ("Paljonko rahaa on enää loppukuuksi?", "Miltä loppukuun käyttövarani näyttää tässä vaiheessa?"):
+        opener = (f"Tämän kuun arjen kulutuksen budjetista on jäljellä {eur_fi(tm['remaining'])}." if tm["remaining"] > 0
+                  else "Tämän kuun arjen kulutuksen budjetti on jo käytetty.")
+        ans = f"{opener}\n\n{ans}"
     return ctx.pack(cid, today, "S03_safe_to_spend_tight_or_over", "coaching", lang, q,
                     [("call_1", "get_safe_to_spend", {}, out_str)], ans)
 
@@ -324,12 +370,16 @@ S04_Q_FI = [
     "Paljonko minulla meni viime kuussa välttämättömiin, yllättäviin ja arjen menoihin?",
     "Miltä viime kuun menot näyttävät S-Pankin kolmessa korissa?",
     "Erittelisitkö viime kuun ostokseni kolmeen kulutuskoriin?",
+    'Mihin kaikkeen rahaa kului viime kuussa?',
+    'Kokonaiskuva viime kuun menoista, kiitos.',
+    'Miten viime kuun menot jakautuivat kategorioihin?',
 ]
 S04_Q_EN = [
     "Break down my spending last month into the three baskets.",
     "How did my money split across the three spending baskets last month?",
     "Show me my regular essentials, unexpected necessities, and everyday spending for last month.",
     "Where did my spending go across S-Bank's three baskets last month?",
+    "Break down last month's spending for me.",
 ]
 
 
@@ -360,7 +410,7 @@ def build_s04(ctx, cid: str, today: date, lang: str, variant: int) -> dict:
         ev_str = _join_fi([f"{CAT_FI[c['category']][0]} {eur_fi(c['total_eur'])}" for c in every_top])
         un_str = (
             _join_fi([f"{CAT_FI[c['category']][0]} {eur_fi(c['total_eur'])}" for c in unexp_top])
-            if unexp_top else "ei ostoja tässä kuussa"
+            if unexp_top else "ei ostoja"
         )
         v = variant % 3
         if v == 0:
@@ -422,6 +472,8 @@ S05_Q_FI = [
     "Millaisia yllättäviä tai poikkeuksellisen suuria ostoksia minulle on osunut viime kuukausina?",
     "Kuinka paljon rahaa on mennyt yllättäviin menoihin kuuden viime kuukauden aikana?",
     "Paljonko minun kannattaisi varata puskuria yllättäviin menoihin toteutuneen kulutukseni perusteella?",
+    'Onko minulle tullut viime aikoina yllättäviä menoja?',
+    'Paljonko puskuria minun pitäisi pitää yllätysten varalle?',
 ]
 S05_Q_EN = [
     "How much have I spent on unexpected necessities over the past six months?",
@@ -476,6 +528,11 @@ def build_s05(ctx, cid: str, today: date, lang: str, variant: int) -> dict:
             f"**Tip:** Setting aside around {eur_en(unexp['monthly_average_eur'])} each month into a savings buffer helps smooth out lumpy costs like dental bills or home repairs."
         )
 
+    # Buffer-size questions get the size first (approved opener, step 4).
+    if q in ("Paljonko puskuria minun pitäisi pitää yllätysten varalle?",
+             "Paljonko minun kannattaisi varata puskuria yllättäviin menoihin toteutuneen kulutukseni perusteella?"):
+        ans = (f"Yleinen nyrkkisääntö on 1–3 kuukauden välttämättömät menot. Sinulla ne ovat keskimäärin "
+               f"{eur_fi(data['baskets']['regular_essentials']['monthly_average_eur'])}/kk.\n\n{ans}")
     return ctx.pack(cid, today, "S05_unexpected_and_buffer", "coaching", lang, q,
                     [("call_1", "get_basket_summary", args, out_str)], ans)
 
@@ -488,6 +545,8 @@ S06_Q_FI = [
     "Miltä viime kuun tuloni ja menoni näyttävät kokonaisuutena?",
     "Mihin rahani kuluivat viime kuussa tältä tililtä?",
     "Näytä viime kuun kulutukseni koreittain ja rahaliikenne tililläni.",
+    'Miksi tililläni näkyy niin vähän menoja, vaikka palkka on iso?',
+    'Minne palkkani menee heti palkkapäivän jälkeen?',
 ]
 S06_Q_EN = [
     "Give me a full overview of my spending and money movements last month.",
@@ -530,6 +589,13 @@ def build_s06(ctx, cid: str, today: date, lang: str, variant: int) -> dict:
             f"such as housing or utilities, may be paid from another account not shown in this view."
         )
 
+    # "Why" first (approved opener, step 4).
+    if q == "Minne palkkani menee heti palkkapäivän jälkeen?":
+        ans = (f"Suurin osa palkastasi, {eur_fi(swept)} eli {pct_fi(swept_pct)}, siirtyy toiselle tilille. "
+               f"En näe, mihin se siellä käytetään.\n\n{ans}")
+    if q == "Miksi tililläni näkyy niin vähän menoja, vaikka palkka on iso?":
+        ans = ("Menoja näkyy vähän, koska palkastasi siirtyy suurin osa toiselle tilille. "
+               f"Sieltä maksetut menot eivät näy tässä.\n\n{ans}")
     return ctx.pack(cid, today, "S06_salary_sweep_caveat", "coaching", lang, q,
                     [("call_1", "get_basket_summary", args, out_str)], ans)
 
@@ -552,6 +618,8 @@ def build_s07(ctx, cid: str, today: date, lang: str, variant: int) -> dict:
                 "Mitkä olivat suurimmat menoluokkani viime kuussa?",
                 "Näytä viime kuun kulutukseni kategorioittain suurimmasta pienimpään.",
                 "Mihin kategorioihin rahani kuluivat eniten viime kuussa?",
+                "Mihin kulutan eniten rahaa?",
+                "Mikä on suurin menoluokkani?",
             ]
             q = qs[variant % len(qs)]
             bullets = "\n".join(
@@ -640,6 +708,8 @@ def build_s08(ctx, cid: str, today: date, lang: str, variant: int) -> dict:
             f"Kuinka paljon rahaa meni {fi_target} viime kuussa?",
             f"Paljonko kulutin {fi_target} {FI_MONTH_IN[m_num]}?",
             f"Näetkö tilitapahtumistani, paljonko käytin {fi_target} viime kuukaudelta?",
+            f"Paljonko {fi_target} meni rahaa viime kuussa?",
+            f"Kuinka paljon maksoin viime kuussa {fi_target}?",
         ]
         q = q_templates[variant % len(q_templates)]
         m_nom = MERCHANT_FI[mtype][0]
@@ -677,7 +747,8 @@ def build_s09(ctx, cid: str, today: date, lang: str, variant: int) -> dict:
         txs = [t for t in data["transactions"] if t["amount_eur"] < 0 and t["merchant_type"] is not None][:3]
         if lang == "fi":
             m_phrase = month_in_fi(m_num, y_num, today.year)
-            q = f"Mitkä olivat kolme suurinta yksittäistä menoerääni {FI_MONTH_IN[m_num]}?"
+            q = [f"Mitkä olivat kolme suurinta yksittäistä menoerääni {FI_MONTH_IN[m_num]}?",
+                 "Mitkä olivat viime kuun isoimmat ostokseni?"][(variant // 2) % 2]
             lines = "\n".join(
                 f"- **{eur_fi(abs(t['amount_eur']))}**: {cap_first(CAT_FI.get(t['category'], (t['category'].lower(),))[0])}"
                 for t in txs
@@ -708,7 +779,8 @@ def build_s09(ctx, cid: str, today: date, lang: str, variant: int) -> dict:
         first_b, last_b = bals[0], bals[-1]
         diff = data["change_eur"]
         if lang == "fi":
-            q = "Miten käyttötilini saldo on kehittynyt kuuden viime kuukauden aikana?"
+            q = ["Miten käyttötilini saldo on kehittynyt kuuden viime kuukauden aikana?",
+                 "Onko saldoni kasvanut vai pienentynyt puolen vuoden aikana?"][(variant // 2) % 2]
             direction = (
                 f"noussut **{eur_fi(diff)}**" if diff > 0
                 else (f"laskenut **{eur_fi(abs(diff))}**" if diff < 0 else "pysynyt samalla tasolla")
@@ -741,10 +813,14 @@ S10_Q_FI = [
     "Käytänkö arjen asioihin enemmän vai vähemmän rahaa kuin ikäiseni keskimäärin?",
     "Millainen rahankäyttäjä olen verrattuna muihin samanikäisiin asiakkaisiin?",
     "Mitkä menoni erottuvat eniten ikäryhmäni tyypillisestä kulutuksesta?",
+    'Olenko säästeliäs vai tuhlaileva muihin verrattuna?',
+    'Olenko tavallinen kuluttaja ikäisiini verrattuna?',
+    'Missä kulutan eniten muihin verrattuna?',
 ]
 S10_Q_EN = [
     "How does my spending compare with other people my age?",
     "Where do my spending habits stand out compared with my age group?",
+    'Do I spend more than people my age?',
 ]
 
 
@@ -855,6 +931,15 @@ def build_s10(ctx, cid: str, today: date, lang: str, variant: int) -> dict:
             f"Based on your own budget and balance today, your safe-to-spend amount this week is **{eur_en(safe_wk)}**."
         )
 
+    # Give the verdict first (approved opener, step 4).
+    if q == "Käytänkö arjen asioihin enemmän vai vähemmän rahaa kuin ikäiseni keskimäärin?":
+        ans = f"Arjen kulutukseen käytät {eur_fi(ev_bsk['my_monthly'])}/kk, eli {_vs_median_fi(ev_diff)}.\n\n{ans}"
+    if q in ("Olenko tavallinen kuluttaja ikäisiini verrattuna?", "Olenko säästeliäs vai tuhlaileva muihin verrattuna?",
+             "Millainen rahankäyttäjä olen verrattuna muihin samanikäisiin asiakkaisiin?"):
+        opener = {"above_peers": "Kulutat ikäisiisi verrattuna enemmän kuin useimmat.",
+                  "below_peers": "Kulutat ikäisiisi verrattuna vähemmän kuin useimmat.",
+                  "typical": "Kulutuksesi on ikäisiisi verrattuna tavallisella tasolla."}[lvl]
+        ans = f"{opener}\n\n{ans}"
     return ctx.pack(
         cid, today, "S10_peer_comparison_and_budget", "coaching", lang, q,
         [("call_1", "compare_with_peers", {}, p_str), ("call_2", "get_safe_to_spend", {}, s_str)],
@@ -889,7 +974,9 @@ def build_s11(ctx, cid: str, today: date, lang: str, variant: int) -> dict:
 
     if lang == "fi":
         nom, ill, elat = CAT_FI[cat]
-        q = f"Paljonko säästäisin kuukaudessa ja vuodessa, jos vähentäisin kuluja {elat} {pct} %?"
+        q = [f"Paljonko säästäisin kuukaudessa ja vuodessa, jos vähentäisin kuluja {elat} {pct} %?",
+             f"Laske, paljonko säästän, jos käytän {ill} {pct} % vähemmän.",
+             f"Mitä jos käyttäisin {ill} {pct} % vähemmän?"][(variant // len(S11_CUTS)) % 3]
         ans = (
             f"Jos käytät {ill} {pct_fi(pct, 0)} vähemmän, säästät **{eur_fi(m_save)} kuukaudessa** "
             f"ja **{eur_fi(y_save)} vuodessa**.\n\n"
@@ -947,6 +1034,9 @@ def build_s12(ctx, cid: str, today: date, lang: str, variant: int) -> dict:
             "Kuinka paljon pystyisin laittamaan säästöön kuukausittain ilman, että arki kiristyy liikaa?",
             "Paljonko minun olisi turvallista siirtää puskuriin joka kuukausi?",
             "Millainen kuukausisäästösumma sopisi nykyisiin tuloihini ja menoihini?",
+            "Paljonko saisin laitettua sivuun kuukaudessa?",
+            "Paljonko minun kannattaisi siirtää säästötilille palkkapäivänä?",
+            "Riittävätkö rahani säännölliseen säästämiseen?",
         ]
         q = qs[variant % len(qs)]
         if m_save > 0:
@@ -967,7 +1057,8 @@ def build_s12(ctx, cid: str, today: date, lang: str, variant: int) -> dict:
                 f"Katsotaanko, mistä menoluokasta löytyisi helpoin 20–30 € kuukausisäästö?"
             )
     else:
-        q = "How much could I safely move into savings each month based on my recent history?"
+        q = ["How much could I safely move into savings each month based on my recent history?",
+             "How much could I save every month?"][variant % 2]
         if m_save > 0:
             ans = (
                 f"Based on the last 6 complete months ({range_en(s6, e6)}), you can safely save **{eur_en(m_save)} per month**, "
@@ -1072,6 +1163,19 @@ S13_CONCEPTS_EN = [
         "- How does my spending compare with others my age?\n\n"
         "What would you like to look at first?"
     ),
+]
+
+
+def _reword(pool, question, existing_start):
+    """A new wording of an existing question, with the existing (reviewed) answer."""
+    return (question, next(a for q, a in pool if q.startswith(existing_start)))
+
+
+S13_CONCEPTS_FI += [
+    _reword(S13_CONCEPTS_FI, "Mikä on katevaraus?", "Mitä tarkoittaa katevaraus"),
+    _reword(S13_CONCEPTS_FI, "Mikä ero on e-laskulla ja suoramaksulla?", "Mikä ero on e-laskulla"),
+    _reword(S13_CONCEPTS_FI, "Mitä tarkoittaa todellinen vuosikorko?", "Mitä todellinen vuosikorko"),
+    _reword(S13_CONCEPTS_FI, "Onko hätävara sama asia kuin puskuri?", "Mitä eroa on taloudellisella puskurilla"),
 ]
 
 

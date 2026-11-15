@@ -1,6 +1,6 @@
 # Fine-tuning plan
 
-**Status: steps 1–10 done; training templates reviewed by a native speaker on 14 Nov 2026** ([S_PANKKI_REFERENCE.md](S_PANKKI_REFERENCE.md) vocabulary/voice/rules, [POLICY.md](POLICY.md), guardrail and prompt rules, test set in `evals/coach/`, Gemma + Claude Opus baselines in [RESULTS.md](RESULTS.md), and 280 verified training/validation conversations in `training/`). Nothing is trained yet; next is step 11. Related: [SETUP.md](SETUP.md) (how the coach runs), [BASKETS.md](BASKETS.md) (spending rules), `evals/finnish/` (Finnish language check).
+**Status: steps 1–10 done; training templates reviewed by a native speaker on 14 Nov 2026** ([S_PANKKI_REFERENCE.md](S_PANKKI_REFERENCE.md) vocabulary/voice/rules, [POLICY.md](POLICY.md), guardrail and prompt rules, test set in `evals/coach/`, Gemma + Claude Opus baselines in [RESULTS.md](RESULTS.md), and 280 verified training/validation conversations in `training/`). First round trained on 15 Nov 2026 (steps 11–13: `training/train_lora.py` on Modal via `deploy/modal_train.py`, served from `Henrisal/gemma-coach-fi`); results and the next round in [RESULTS.md](RESULTS.md#fine-tuned-gemma-15-nov-2026). Related: [SETUP.md](SETUP.md) (how the coach runs), [BASKETS.md](BASKETS.md) (spending rules), `evals/finnish/` (Finnish language check).
 
 ## Goal
 
