@@ -144,8 +144,10 @@ def test_spending_tool_adds_monthly_averages(tools, monkeypatch):
         queries,
         "spending_by_category",
         lambda *args: [
-            {"category": "Groceries", "total_spending_eur": Decimal("900.00"), "transaction_count": 9},
-            {"category": "Travel", "total_spending_eur": Decimal("90.00"), "transaction_count": 1},
+            {"category": "Groceries", "total_spending_eur": Decimal("900.00"), "transaction_count": 9,
+             "months_with_purchases": 3},
+            {"category": "Travel", "total_spending_eur": Decimal("90.00"), "transaction_count": 1,
+             "months_with_purchases": 1},
         ],
     )
 
@@ -158,8 +160,11 @@ def test_spending_tool_adds_monthly_averages(tools, monkeypatch):
         "total_eur": 900.0,
         "monthly_average_eur": 304.38,  # 900 * 30.4375 / 90 = 304.375
         "transaction_count": 9,
+        "months_with_purchases": 3,
     }
+    assert result["months_in_period"] == 3
     assert result["categories"][1]["monthly_average_eur"] == 30.44
+    assert result["categories"][1]["months_with_purchases"] == 1  # uneven: one month of three
     assert result["total_eur"] == 990.0
     assert result["monthly_average_eur"] == 334.81  # 990 * 30.4375 / 90 = 334.8125
 
@@ -492,3 +497,19 @@ def test_compare_with_peers_unknown_customer(monkeypatch):
     tool = {t.name: t for t in spending.load_tools("CUST09999", date(2026, 9, 10))}["compare_with_peers"]
     with pytest.raises(ValueError, match="Unknown customer"):
         tool.run({})
+
+
+def test_one_category_says_how_many_months_had_purchases(tools, monkeypatch):
+    rows = [{"tx_date": date(2026, m, 5), "category": "Restaurants", "mcc_code": "5812", "amount_eur": 10.0}
+            for m in (1, 1, 3)]
+    rows.append({"tx_date": date(2026, 2, 5), "category": "Groceries", "mcc_code": "5411", "amount_eur": 50.0})
+    monkeypatch.setattr(queries, "consumption_transactions", lambda *args: rows)
+
+    result = run(tools, "get_spending_by_category", {**Q1, "category": "Restaurants"})
+
+    assert (result["months_with_purchases"], result["months_in_period"]) == (2, 3)
+
+
+def test_months_in_period():
+    assert spending._months_in(date(2026, 3, 1), date(2026, 8, 31)) == 6
+    assert spending._months_in(date(2025, 9, 11), date(2026, 9, 10)) == 13

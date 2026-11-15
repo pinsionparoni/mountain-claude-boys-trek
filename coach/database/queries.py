@@ -52,7 +52,8 @@ def spending_by_category(
         SELECT
             COALESCE(category, 'Uncategorized') AS category,
             SUM(-tx_amount_eur) AS total_spending_eur,
-            COUNT(*) AS transaction_count
+            COUNT(*) AS transaction_count,
+            COUNT(DISTINCT DATE_TRUNC('month', tx_date)) AS months_with_purchases
         FROM transactions
         WHERE customer_id = %s
           AND tx_date >= %s
@@ -161,6 +162,36 @@ def consumption_transactions(
                     CONSUMPTION_TRANSACTION_TYPES,
                 ),
             )
+            return cur.fetchall()
+
+
+def account_transactions(customer_id: str, start_date: date, end_date: date) -> list[dict]:
+    """
+    Return all of a customer's transactions in a period, oldest first, for
+    coach/explore.py: ``tx_timestamp``, ``category``, ``transaction_type``,
+    ``mcc_code``, ``amount_eur`` (signed, negative is money out) and
+    ``balance_after_eur``. About 50 a month per customer. Dates are inclusive.
+    """
+    _validate_customer_and_dates(customer_id, start_date, end_date)
+
+    query = """
+        SELECT
+            tx_timestamp,
+            COALESCE(category, 'Uncategorized') AS category,
+            transaction_type,
+            mcc_code,
+            tx_amount_eur AS amount_eur,
+            balance_after_eur
+        FROM transactions
+        WHERE customer_id = %s
+          AND tx_date >= %s
+          AND tx_date <= %s
+        ORDER BY tx_timestamp, id;
+    """
+
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(query, (customer_id, start_date, end_date))
             return cur.fetchall()
 
 

@@ -958,18 +958,35 @@ html, body, #root { block-size: 100%; overflow: hidden; }
 /* Columns: a trend per month. The month in progress is a lighter step, so it
    doesn't read as a drop. */
 .columns { display: grid; gap: 6px; align-items: end; }
-.column { display: grid; grid-template-rows: auto 96px auto; justify-items: center; gap: 4px; min-inline-size: 0; }
-.column-value { font-size: 0.72rem; color: var(--sp-neutral-strongest); white-space: nowrap; font-variant-numeric: tabular-nums; min-block-size: 1.1em; }
-.column-track { display: flex; align-items: end; inline-size: 100%; max-inline-size: 22px; block-size: 96px; border-block-end: 1px solid var(--sp-border-subtle); }
+/* Room above the tallest bar for its value label; month names never wrap, so every bar
+   shares one baseline. */
+.columns { padding-block-start: 1.3em; }
+.column { display: grid; grid-template-rows: 96px 1.2em; justify-items: center; gap: 4px; min-inline-size: 0; }
+.column-track { display: flex; align-items: end; justify-content: center; inline-size: 100%; block-size: 96px; border-block-end: 1px solid var(--sp-border-subtle); }
 .column-fill {
+  position: relative;
   display: block;
+  max-inline-size: 22px;
   inline-size: 100%;
   border-radius: 4px 4px 0 0;
   background: var(--chart-series);
   transition: block-size var(--sp-duration-slow) var(--sp-ease-entry);
 }
 .column.is-partial .column-fill { background: var(--sp-green-light); }
-.column-month { font-size: 0.72rem; color: var(--sp-neutral-secondary); }
+.column-value {
+  position: absolute;
+  inset-block-end: calc(100% + 2px);
+  inset-inline-start: 50%;
+  transform: translateX(-50%);
+  font-size: 0.72rem;
+  color: var(--sp-neutral-strongest);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+/* At the chart's edges, keep the label inside the chart. */
+.column-value.at-start { inset-inline-start: 0; transform: none; }
+.column-value.at-end { inset-inline-start: auto; inset-inline-end: 0; transform: none; }
+.column-month { font-size: 0.72rem; color: var(--sp-neutral-secondary); white-space: nowrap; line-height: 1.2; }
 
 /* Balance line */
 .line-chart { position: relative; block-size: 110px; margin-inline-end: 4.5em; }

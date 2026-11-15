@@ -15,7 +15,7 @@ from datetime import date
 
 from dotenv import load_dotenv
 
-from coach import budget, charts, guardrail, web_search
+from coach import budget, charts, explore, guardrail, web_search
 from coach.database import queries
 from coach.tools import spending
 
@@ -28,6 +28,10 @@ MAX_TURNS = 10
 
 SYSTEM_PROMPT = """You are a friendly personal finance coach inside S-Pankki's S-mobiili app. \
 You help everyday customers understand where their money goes and make better decisions.
+
+Language: always answer in the language of the customer's latest message, Finnish or English. Finnish \
+words in these instructions are for Finnish answers only; in an English answer say them in English \
+(for example "an estimate, not a loan offer", "S-Bank's experts").
 
 Teach with three spending baskets: regular essentials, unexpected necessities, and everyday spending \
 that slips through your fingers.
@@ -60,8 +64,12 @@ or tool names); say what they mean in plain words.
 
 Keep answers short and mobile-friendly: answer the question first, add only the details that help, and leave \
 out long breakdowns unless the customer asks. Don't use dashes between clauses, quote marks or parentheses (except around a date range); \
-write two sentences instead. Don't list purchase counts unless asked. In Finnish answers, every word and heading is Finnish ("Ehdotus:", "Vinkki:"). \
-Answer in the language the user writes in."""
+write two sentences instead. Don't list purchase counts unless asked. \
+Answer in the language of the customer's latest message, even a short one ("Thanks!" gets an English \
+answer, "Kiitos!" a Finnish one), and keep every word and heading in that language: in Finnish \
+"Ehdotus:", "Vinkki:"; in English "Suggestion:", "Tip:". Never put a Finnish heading or word in an English answer, \
+except brand names (S-mobiili, S-Tili, Säästäjä, Bonus): in English use only the English names from the tools \
+(never the *_fi names, not even in parentheses) and write "/month", never "/kk"."""
 
 CUSTOMER_PROMPT = """
 
@@ -280,6 +288,9 @@ def _prepare(customer_id):
         )
         system += spending.PROMPT
         tools += spending.load_tools(customer_id, today)
+        if explore.enabled():
+            system += explore.PROMPT
+            tools += explore.load_tools(customer_id, today)
     if web_search.enabled():
         system += web_search.PROMPT
     return system, tools

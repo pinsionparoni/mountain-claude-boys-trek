@@ -65,6 +65,9 @@ get_basket_summary places every purchase by merchant type: e.g. fuel, parking an
 transport are regular essentials, taxis are everyday spending, doctors and dentists are unexpected necessities, and \
 large one-off Health or Home & Tech purchases are unexpected necessities. Purchases without a merchant type are \
 "other". Explain the placement when it matters and that the customer can see things differently.
+- Averages: if months_with_purchases is well below months_in_period, the spending is uneven: say so next to the \
+average ("keskimäärin 2 kertaa kuukaudessa, mutta kaikki ostot osuvat kolmelle kuukaudelle"), so an average never \
+hides that.
 - For questions about one kind of merchant (taxis, fuel, pharmacies, cafés), call get_spending_by_category with \
 that category to get its merchant types. Mention unusual_purchases when they explain a month.
 - For "what kind of spender am I?", "is my spending normal?" or comparisons with other people, call compare_with_peers. \
@@ -95,6 +98,11 @@ If the customer asks for a chart or a different view ("show it as a chart", "by 
 - Salary, other income, salary sweeps and investments are money movements, not spending. They are never in the baskets.
 - If get_basket_summary says has_salary_sweep is true, tell the customer that their mandatory totals may be incomplete, \
 using salary_sweep_note (salary_sweep_note_fi in Finnish)."""
+
+
+def _months_in(start, end):
+    """Calendar months the period touches (1.3.–31.8. is 6)."""
+    return (end.year - start.year) * 12 + end.month - start.month + 1
 
 
 class CoachTool(dict):
@@ -274,6 +282,7 @@ def load_tools(customer_id, today=None):
             transactions = queries.consumption_transactions(customer_id, start, end)
             types = spending_baskets.merchant_breakdown(transactions, category)
             total = sum((Decimal(str(m["total_eur"])) for m in types), Decimal(0))
+            months_with = len({tx["tx_date"].isoformat()[:7] for tx in transactions if tx["category"] == category})
             for m in types:
                 m["monthly_average_eur"] = calculations.monthly_equivalent(m["total_eur"], days)
             return {
@@ -282,6 +291,8 @@ def load_tools(customer_id, today=None):
                 "merchant_types": types,
                 "total_eur": _eur(total),
                 "monthly_average_eur": calculations.monthly_equivalent(total, days),
+                "months_with_purchases": months_with,
+                "months_in_period": _months_in(start, end),
             }
 
         rows = queries.spending_by_category(customer_id, start, end)
@@ -297,6 +308,7 @@ def load_tools(customer_id, today=None):
                     "total_eur": _eur(amount),
                     "monthly_average_eur": calculations.monthly_equivalent(amount, days),
                     "transaction_count": row["transaction_count"],
+                    "months_with_purchases": row["months_with_purchases"],
                 }
             )
 
@@ -306,6 +318,7 @@ def load_tools(customer_id, today=None):
                 "end_date": end.isoformat(),
                 "days": days,
             },
+            "months_in_period": _months_in(start, end),
             "categories": categories,
             "total_eur": _eur(total),
             "monthly_average_eur": calculations.monthly_equivalent(total, days),
