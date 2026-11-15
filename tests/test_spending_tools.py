@@ -513,3 +513,15 @@ def test_one_category_says_how_many_months_had_purchases(tools, monkeypatch):
 def test_months_in_period():
     assert spending._months_in(date(2026, 3, 1), date(2026, 8, 31)) == 6
     assert spending._months_in(date(2025, 9, 11), date(2026, 9, 10)) == 13
+
+
+def test_numbers_sent_as_text_are_read_as_numbers():
+    """Gemma sometimes quotes numbers in nested objects ("19.09"); the tool reads them as numbers."""
+    from coach.tools.spending import _as_schema
+
+    schema = {"type": "object", "additionalProperties": {"type": "number"}}
+    assert _as_schema({"Restaurants": "194.83", "Travel": "20"}, schema) == {"Restaurants": 194.83, "Travel": 20}
+    assert _as_schema({"Restaurants": "12,5"}, schema) == {"Restaurants": 12.5}
+    assert _as_schema({"Restaurants": "lots"}, schema) == {"Restaurants": "lots"}   # left for the tool's checks
+    assert _as_schema("7", {"type": "integer"}) == 7
+    assert _as_schema("CUST00001", {"type": "string"}) == "CUST00001"
