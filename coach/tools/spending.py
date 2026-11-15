@@ -137,7 +137,32 @@ class CoachTool(dict):
         if missing:
             raise ValueError(f"missing required argument(s): {', '.join(missing)}")
 
+        tool_input = {key: _as_schema(value, schema["properties"][key]) for key, value in tool_input.items()}
         return json.dumps(with_finnish_names(self._handler(tool_input)))
+
+
+def _as_schema(value, schema):
+    """Numbers the model sent as text ("19.09") become numbers where the schema asks for one.
+
+    Some models quote numbers inside nested objects; without this the tool rejects the call
+    and the model retries the same call until it runs out of steps. Anything else is left
+    as it is, for the tool's own checks.
+    """
+    kind = schema.get("type")
+    if kind in ("number", "integer") and isinstance(value, str):
+        try:
+            number = float(value.strip().replace(",", "."))
+        except ValueError:
+            return value
+        if kind == "integer":
+            return int(number) if number.is_integer() else value
+        return int(number) if number.is_integer() and "." not in value and "," not in value else number
+    if kind == "object" and isinstance(value, dict):
+        props, extra = schema.get("properties", {}), schema.get("additionalProperties")
+        return {k: _as_schema(v, props.get(k, extra if isinstance(extra, dict) else {})) for k, v in value.items()}
+    if kind == "array" and isinstance(value, list):
+        return [_as_schema(v, schema.get("items", {})) for v in value]
+    return value
 
 
 # --------------------------------------------------------------------------
