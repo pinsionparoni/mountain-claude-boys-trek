@@ -27,14 +27,14 @@ def test_training_and_val_files_exist_and_counts():
     assert VAL_PATH.exists(), "training/val.jsonl missing"
     train = _load_jsonl(TRAIN_PATH)
     val = _load_jsonl(VAL_PATH)
-    assert len(train) == 250
+    assert len(train) == 304
     assert len(val) == 30
 
     all_recs = train + val
     fi_count = sum(1 for r in all_recs if r["lang"] == "fi")
     en_count = sum(1 for r in all_recs if r["lang"] == "en")
-    assert fi_count == 224
-    assert en_count == 56
+    assert fi_count == 272
+    assert en_count == 62
 
 
 def test_zero_overlap_with_evals_and_between_splits():
